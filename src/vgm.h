@@ -13,7 +13,7 @@ typedef struct {
     bool has_loop;
     bool loop_enabled;
 
-    uint8_t buffer[512];
+    uint8_t buffer[256];
     uint16_t buffer_pos;
     uint16_t buffer_size;
 } vgm_player_t;

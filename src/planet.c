@@ -306,116 +306,108 @@ static void deliver_cargo(void)
 static void planet_hud_draw(void)
 {
     static const uint8_t world_col[NUM_WORLDS] = {
-        C_GREEN, C_RED, C_CYAN, C_MAGENTA, C_GOLD, C_YELLOW
+        C_GREEN, C_RED, C_CYAN, C_MAGENTA, C_GOLD, C_GREEN
     };
 
     hud_top_clear();
-    /* Row 0: Credits | World badge | Creature gems | Storm status */
-    hud_top_put(0, 0, 4, C_GOLD, C_PANEL);
-    hud_top_put(1, 0, '$', C_GOLD, C_PANEL);
+    /* Row 0: Credits | World + Level | Graphical Creature Icons | Storm Status */
+    hud_top_str(1, 0, "$", C_GOLD);
     hud_top_num(2, 0, g_voy.credits, 5, C_WHITE);
-    hud_top_put(7, 0, 179, C_FRAME, C_PANEL);
+    hud_top_tile(8, 0, HT_DIV);
 
-    hud_top_str(8, 0, WORLD_NAMES[p_world], world_col[p_world]);
-    hud_top_put(14, 0, 'L', C_GREY, C_FRAME);
-    hud_top_put(15, 0, (uint8_t)('0' + p_level), C_WHITE, C_FRAME);
-    hud_top_put(16, 0, 179, C_FRAME, C_PANEL);
+    hud_top_str(9, 0, WORLD_NAMES[p_world], world_col[p_world]);
+    hud_top_str(15, 0, "L", C_GREY);
+    hud_top_num(16, 0, p_level, 1, C_WHITE);
+    hud_top_tile(18, 0, HT_DIV);
 
-    /* Creature status gems */
-    hud_top_str(17, 0, "BIO", C_TEAL);
+    /* Custom 4bpp pixel-art creature gem icons */
     for (uint8_t i = 0; i < p_pop_init; i++) {
         bool caught = (creatures[i].active == 0);
-        hud_top_put((uint8_t)(21 + i * 2), 0, caught ? 4 : 9, caught ? C_GOLD : C_GREEN, C_PANEL);
+        hud_top_tile((uint8_t)(20 + i * 2), 0, caught ? HT_ICO_BIO_HI : HT_ICO_BIO_LO);
     }
-    hud_top_put(29, 0, 179, C_FRAME, C_PANEL);
+    hud_top_tile(29, 0, HT_DIV);
 
     if (storm_phase == 0) {
-        hud_top_str(30, 0, "ORBIT OK", C_TEAL);
+        hud_top_str(31, 0, "ORBIT OK", C_TEAL);
     } else {
-        hud_top_str(30, 0, "!!STORM!!", (g_frame & 8u) ? C_RED : C_GOLD);
+        hud_top_str(30, 0, "STORM!!", (g_frame & 8u) ? C_RED : C_GOLD);
     }
 
-    /* Row 1: Wide 24-cell Planetary Radar in recessed well */
-    for (uint8_t c = 0; c < 40; c++)
-        hud_top_put(c, 1, 196, C_FRAME, C_PANEL);
-    uint8_t sc0 = 8; /* cols 8..31 = 24 cells */
+    /* Row 1: Custom 4bpp Pixel-Art 24-cell Planetary Radar */
+    uint8_t sc0 = 8;
     hud_top_str(1, 1, "RADAR", C_CYAN);
-    hud_top_put(sc0 - 1, 1, 181, C_CYAN, C_PANEL);
-    hud_top_put(sc0 + 24, 1, 198, C_CYAN, C_PANEL);
+    hud_top_tile(sc0 - 1, 1, HT_RAD_L);
+    hud_top_tile(sc0 + 24, 1, HT_RAD_R);
     for (uint8_t i = 0; i < 24; i++)
-        hud_top_put((uint8_t)(sc0 + i), 1, 250, C_DIM, C_FRAME);
+        hud_top_tile((uint8_t)(sc0 + i), 1, HT_RAD_EMPTY);
 
     /* 4 Towers on radar */
     for (uint8_t t = 0; t < NUM_TOWERS; t++) {
         uint8_t cell = (uint8_t)((uint16_t)(TOWER_OFFSET + t * TOWER_SPACING) * 24u / WORLD_W);
-        hud_top_put((uint8_t)(sc0 + cell), 1, 179, C_GREY, C_FRAME);
+        hud_top_tile((uint8_t)(sc0 + cell), 1, HT_RAD_TOWER);
     }
-    /* Ark on radar (center = cell 12) */
-    hud_top_put((uint8_t)(sc0 + 12), 1, 'A', C_GOLD, C_FRAME);
-
     /* Creatures on radar */
     for (uint8_t i = 0; i < MAX_CREATURES; i++) {
         if (creatures[i].active == 1 || creatures[i].active == 2) {
             uint8_t cell = (uint8_t)((uint16_t)(creatures[i].wx & WORLD_MASK) * 24u / WORLD_W);
-            hud_top_put((uint8_t)(sc0 + cell), 1, '*', C_GREEN, C_FRAME);
+            hud_top_tile((uint8_t)(sc0 + cell), 1, HT_RAD_BIO);
         }
     }
     /* Relic on radar */
     for (uint8_t i = 0; i < MAX_CRATES; i++) {
         if (crates[i].active && crates[i].is_relic) {
             uint8_t cell = (uint8_t)((uint16_t)(crates[i].wx & WORLD_MASK) * 24u / WORLD_W);
-            hud_top_put((uint8_t)(sc0 + cell), 1, 4, C_MAGENTA, C_FRAME);
+            hud_top_tile((uint8_t)(sc0 + cell), 1, HT_RAD_RELIC);
         }
     }
+    /* Ark on radar (center = cell 12) */
+    hud_top_tile((uint8_t)(sc0 + 12), 1, HT_RAD_ARK);
     /* Shuttle on radar */
     if (shu_st != SHU_DEAD) {
         uint8_t cell = (uint8_t)((uint16_t)(shu_wx & WORLD_MASK) * 24u / WORLD_W);
-        hud_top_put((uint8_t)(sc0 + cell), 1, 30, (g_frame & 8u) ? C_WHITE : C_CYAN, C_FRAME);
+        hud_top_tile((uint8_t)(sc0 + cell), 1, HT_RAD_SHU);
     }
     /* Storm rock alert on radar */
-    if (storm_phase == 2) {
-        hud_top_put((uint8_t)(sc0 + 12), 1, '!', (g_frame & 4u) ? C_RED : C_GOLD, C_FRAME);
+    if (storm_phase == 2 && (g_frame & 4u)) {
+        hud_top_tile((uint8_t)(sc0 + 12), 1, HT_RAD_STORM);
     }
 
-    /* Bottom HUD: Row 0 = Energy gauge | Shuttle Bay pill | Cargo Holds */
+    /* Bottom HUD: Row 0 = 4bpp Energy Bar | Shuttle Bay | Cargo Holds */
     hud_bot_clear();
-    hud_bot_put(0, 0, 3, C_GREEN, C_PANEL);
-    hud_bot_put(1, 0, '[', C_CYAN, C_PANEL);
-    hud_bot_bar(2, 0, 10, g_voy.energy, voy_hull_max(), C_GREEN, C_RED);
-    hud_bot_put(12, 0, ']', C_CYAN, C_PANEL);
-    hud_bot_put(13, 0, 179, C_FRAME, C_PANEL);
+    hud_bot_tile(0, 0, HT_ICO_BOLT);
+    hud_bot_tile(1, 0, HT_BAR_L);
+    hud_bot_bar(2, 0, 10, g_voy.energy, voy_hull_max(), false);
+    hud_bot_tile(12, 0, HT_BAR_R);
+    hud_bot_tile(13, 0, HT_DIV);
 
-    hud_bot_str(14, 0, "BAY:", C_CYAN);
+    hud_bot_tile(14, 0, HT_ICO_SAUCER);
     if (shu_st == SHU_DEAD)
-        hud_bot_str(18, 0, "REBUILDING", (g_frame & 8u) ? C_RED : C_ORANGE);
+        hud_bot_str(16, 0, "REBUILDING", (g_frame & 8u) ? C_RED : C_ORANGE);
     else if (shu_cargo == CARGO_CREATURE)
-        hud_bot_str(18, 0, SPECIES_NAMES[creatures[shu_cargo_idx].species], C_GREEN);
+        hud_bot_str(16, 0, SPECIES_NAMES[creatures[shu_cargo_idx].species], C_GREEN);
     else if (shu_cargo == CARGO_ORE)
-        hud_bot_str(18, 0, "ORE CRATE ", C_GOLD);
+        hud_bot_str(16, 0, "ORE CRATE", C_GOLD);
     else if (shu_cargo == CARGO_RELIC)
-        hud_bot_str(18, 0, "* RELIC! *", (g_frame & 4u) ? C_MAGENTA : C_WHITE);
+        hud_bot_str(16, 0, "RELIC!", (g_frame & 4u) ? C_MAGENTA : C_WHITE);
     else
-        hud_bot_str(18, 0, "EMPTY     ", C_DIM);
+        hud_bot_str(16, 0, "EMPTY", C_GREY);
 
-    hud_bot_put(29, 0, 179, C_FRAME, C_PANEL);
-    hud_bot_put(30, 0, 240, C_GOLD, C_PANEL); /* holds icon */
-    hud_bot_str(31, 0, "HLD ", C_GOLD);
-    hud_bot_put(35, 0, (uint8_t)('0' + voy_holds_used() / 10), C_WHITE, C_FRAME);
-    hud_bot_put(36, 0, (uint8_t)('0' + voy_holds_used() % 10), C_WHITE, C_FRAME);
-    hud_bot_put(37, 0, '/', C_DIM, C_FRAME);
-    hud_bot_put(38, 0, (uint8_t)('0' + voy_holds_max() / 10), C_CYAN, C_FRAME);
-    hud_bot_put(39, 0, (uint8_t)('0' + voy_holds_max() % 10), C_CYAN, C_FRAME);
+    hud_bot_tile(28, 0, HT_DIV);
+    hud_bot_tile(29, 0, HT_ICO_CRATE);
+    hud_bot_str(31, 0, "HLD", C_GOLD);
+    hud_bot_put(35, 0, (uint8_t)('0' + voy_holds_used() / 10), C_WHITE, C_TRANS);
+    hud_bot_put(36, 0, (uint8_t)('0' + voy_holds_used() % 10), C_WHITE, C_TRANS);
+    hud_bot_put(37, 0, '/', C_DIM, C_TRANS);
+    hud_bot_put(38, 0, (uint8_t)('0' + voy_holds_max() / 10), C_CYAN, C_TRANS);
+    hud_bot_put(39, 0, (uint8_t)('0' + voy_holds_max() % 10), C_CYAN, C_TRANS);
 
-    /* Row 1: Framed cockpit action rail */
-    for (uint8_t c = 0; c < 40; c++)
-        hud_bot_put(c, 1, 205, C_FRAME, C_PANEL);
+    /* Row 1: Clean control hints */
     if (storm_phase == 1 || storm_phase == 2) {
-        uint8_t sc = (g_frame & 8u) ? C_RED : C_GOLD;
-        hud_bot_str(2, 1, " STORM! DOCK & FIRE [UP/LT/RT] ", sc);
+        hud_bot_str(4, 1, "STORM! DOCK & FIRE [UP/LT/RT]", (g_frame & 8u) ? C_RED : C_GOLD);
     } else if (shu_st == SHU_DOCKED) {
-        hud_bot_str(3, 1, " [DOWN] LAUNCH   [HOLD X] LEAVE ", C_CYAN);
+        hud_bot_str(5, 1, "[DOWN] LAUNCH   [HOLD X] LEAVE", C_CYAN);
     } else {
-        hud_bot_str(2, 1, " [Z] BEAM   [X] DROP   [UP] DOCK ", C_GREY);
+        hud_bot_str(4, 1, "[Z] BEAM   [X] DROP   [UP] DOCK", C_GREY);
     }
 }
 
@@ -1055,9 +1047,9 @@ static void planet_render(void)
     if (storm_phase == 2 && idx < SPR_TOTAL_COUNT) {
         int16_t sx = (storm_x >> 4) + (ark_sx - 160);
         int16_t sy = storm_y >> 4;
-        uint8_t rf = (g_frame >> 3) & 1u;
+        uint8_t rf = (g_frame >> 3) & 3u;
         spr_place(idx++, (uint16_t)(XRAM_IMG_ROCK_L + rf * ROCK_L_FRAME_BYTES), PAL_ROCK,
-                  MODE5_SIZE(16, 16), MODE5_4BPP, sx - 8, sy - 8);
+                  MODE5_SIZE(ROCK_L_W, ROCK_L_H), MODE5_4BPP, sx - 10, sy - 10);
     }
     if (ark_bolt_life > 0 && idx < SPR_TOTAL_COUNT) {
         uint8_t bf = (ark_bolt_dy != 0) ? 0u : 2u;

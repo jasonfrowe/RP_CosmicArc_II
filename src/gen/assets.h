@@ -10,23 +10,23 @@
 #define ARK_FRAME_BYTES 1024u
 #define ARK_TOTAL_BYTES 2048u
 
-#define ROCK_L_W 16u
-#define ROCK_L_H 16u
-#define ROCK_L_FRAMES 2u
-#define ROCK_L_FRAME_BYTES 128u
-#define ROCK_L_TOTAL_BYTES 256u
+#define ROCK_L_W 20u
+#define ROCK_L_H 20u
+#define ROCK_L_FRAMES 4u
+#define ROCK_L_FRAME_BYTES 200u
+#define ROCK_L_TOTAL_BYTES 800u
 
-#define ROCK_M_W 12u
-#define ROCK_M_H 12u
-#define ROCK_M_FRAMES 2u
-#define ROCK_M_FRAME_BYTES 72u
-#define ROCK_M_TOTAL_BYTES 144u
+#define ROCK_M_W 16u
+#define ROCK_M_H 16u
+#define ROCK_M_FRAMES 4u
+#define ROCK_M_FRAME_BYTES 128u
+#define ROCK_M_TOTAL_BYTES 512u
 
 #define ROCK_S_W 8u
 #define ROCK_S_H 8u
-#define ROCK_S_FRAMES 2u
+#define ROCK_S_FRAMES 4u
 #define ROCK_S_FRAME_BYTES 32u
-#define ROCK_S_TOTAL_BYTES 64u
+#define ROCK_S_TOTAL_BYTES 128u
 
 #define SAUCER_W 16u
 #define SAUCER_H 12u
@@ -34,11 +34,29 @@
 #define SAUCER_FRAME_BYTES 96u
 #define SAUCER_TOTAL_BYTES 384u
 
-#define PIRATES_W 16u
-#define PIRATES_H 16u
-#define PIRATES_FRAMES 4u
-#define PIRATES_FRAME_BYTES 128u
-#define PIRATES_TOTAL_BYTES 512u
+#define RAIDER_W 16u
+#define RAIDER_H 16u
+#define RAIDER_FRAMES 3u
+#define RAIDER_FRAME_BYTES 128u
+#define RAIDER_TOTAL_BYTES 384u
+
+#define GUNSHIP_W 20u
+#define GUNSHIP_H 20u
+#define GUNSHIP_FRAMES 2u
+#define GUNSHIP_FRAME_BYTES 200u
+#define GUNSHIP_TOTAL_BYTES 400u
+
+#define MISSILE_W 12u
+#define MISSILE_H 12u
+#define MISSILE_FRAMES 3u
+#define MISSILE_FRAME_BYTES 72u
+#define MISSILE_TOTAL_BYTES 216u
+
+#define POD_W 12u
+#define POD_H 12u
+#define POD_FRAMES 2u
+#define POD_FRAME_BYTES 72u
+#define POD_TOTAL_BYTES 144u
 
 #define SHOTS_W 8u
 #define SHOTS_H 8u
@@ -100,6 +118,12 @@
 #define TILES_PLANET_FRAME_BYTES 32u
 #define TILES_PLANET_TOTAL_BYTES 512u
 
+#define TILES_HUD_W 8u
+#define TILES_HUD_H 8u
+#define TILES_HUD_FRAMES 37u
+#define TILES_HUD_FRAME_BYTES 32u
+#define TILES_HUD_TOTAL_BYTES 1184u
+
 #define PAL_HUD 0u
 #define PAL_ARK 1u
 #define PAL_ROCK 2u
@@ -129,16 +153,16 @@
 #define C_FRAME 11u
 #define C_TEAL 12u
 #define C_BLUE 13u
-#define C_PINK 14u
-#define C_YELLOW 15u
+#define C_DARKGREEN 14u
+#define C_DARKRED 15u
 
 #ifdef DEFINE_PALETTE_DATA
 static const uint16_t game_palettes[PAL_COUNT][16] = {
-    /* PAL_HUD */ { 0x0000u, 0x20A1u, 0xFFFFu, 0x46BFu, 0xFF29u, 0x6FAAu, 0x4A7Fu, 0x34FFu, 0xFBBBu, 0xD637u, 0x72A9u, 0x61A4u, 0xADA6u, 0xFCACu, 0xC43Fu, 0xA7FFu },
+    /* PAL_HUD */ { 0x0000u, 0x20A1u, 0xFFFFu, 0x3EBFu, 0xFF28u, 0x6F68u, 0x4A3Fu, 0x2CBFu, 0xFB7Bu, 0xD5F5u, 0x72A8u, 0x4923u, 0xA4A4u, 0xCBA5u, 0x4424u, 0x2935u },
     /* PAL_ARK */ { 0x0000u, 0x51E6u, 0x936Bu, 0xD572u, 0xFF7Bu, 0x3123u, 0x46BFu, 0xAFBFu, 0xFF26u, 0x5A7Fu, 0x87EAu, 0x2D3Fu, 0x41AFu, 0x93A4u, 0x23F6u, 0xFFFFu },
-    /* PAL_ROCK */ { 0x0000u, 0x2168u, 0x3AAEu, 0x5BF4u, 0x8DBBu, 0x18E5u, 0xFFFFu, 0x77BFu, 0x24BFu, 0x21FBu, 0x2170u, 0x62ABu, 0xA4B3u, 0xFF6Eu, 0xFFFFu, 0x573Fu },
+    /* PAL_ROCK */ { 0x0000u, 0x2167u, 0x3A6Cu, 0x5BB2u, 0x9579u, 0x10E4u, 0xFFFFu, 0x77BFu, 0x24BFu, 0x21FBu, 0x2170u, 0x62ABu, 0xA4B3u, 0xFF6Eu, 0xFFFFu, 0x573Fu },
     /* PAL_SAUCER */ { 0x0000u, 0x8B25u, 0xDD6Au, 0xFF33u, 0xFFFEu, 0x46FFu, 0x627Fu, 0x87EAu, 0xFF28u, 0xFBB5u, 0xFFFFu, 0x353Fu, 0x51A3u, 0xE238u, 0xFC68u, 0xA7BFu },
-    /* PAL_PIRATE */ { 0x0000u, 0x20ACu, 0x3137u, 0x62FFu, 0x85FFu, 0x49E6u, 0x8BADu, 0xCDB5u, 0x473Fu, 0x243Fu, 0x6625u, 0xAFF0u, 0x3B23u, 0xFFFFu, 0xFA3Bu, 0xFF29u },
+    /* PAL_PIRATE */ { 0x0000u, 0x20ABu, 0x3136u, 0x5A7Fu, 0x8DBFu, 0x4165u, 0x7B2Bu, 0xC573u, 0x473Fu, 0x1BBFu, 0x6624u, 0xAFF0u, 0x32E2u, 0xFFFFu, 0xFA3Bu, 0xFF68u },
     /* PAL_CREATURES */ { 0x0000u, 0x55A5u, 0x97F0u, 0x2D3Du, 0x773Fu, 0x727Du, 0xB4FFu, 0xEAB2u, 0xFCFAu, 0xEE26u, 0xFFB3u, 0xD33Eu, 0x32F1u, 0x4D3Bu, 0xFFFFu, 0x28E3u },
     /* PAL_SPACE_BG */ { 0x0020u, 0xFFFFu, 0xFDF0u, 0x873Fu, 0xA3ECu, 0x4925u, 0x49A3u, 0x5968u, 0x20A2u, 0xFEB6u, 0xBC2Cu, 0x6DFBu, 0x7AE8u, 0xA53Fu, 0xDFF4u, 0xFFFFu },
     /* PAL_WORLD_0 */ { 0x0000u, 0x28A1u, 0x3223u, 0x55A7u, 0x2A2Cu, 0x1967u, 0x942Eu, 0xDE36u, 0xFFFFu, 0xFEB5u, 0x42BFu, 0x573Fu, 0x3965u, 0x453Fu, 0xB7AAu, 0xFFFFu },

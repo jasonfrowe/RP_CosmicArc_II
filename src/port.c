@@ -340,12 +340,12 @@ bool port_update(void)
                 } else {
                     uint8_t rate = EN_PRICE[pt_tier];
                     uint8_t need = (uint8_t)(mx - g_voy.energy);
-                    uint8_t can = (uint8_t)(g_voy.credits / rate);
+                    uint32_t can = g_voy.credits / rate;
                     if (can == 0) {
                         set_msg("NOT ENOUGH CREDITS");
                         sfx_player(SFX_DENY, SFX_PRI_LOW);
                     } else {
-                        uint8_t buy = (can < need) ? can : need;
+                        uint8_t buy = (can < need) ? (uint8_t)can : need;
                         g_voy.energy += buy;
                         g_voy.credits -= (uint32_t)buy * rate;
                         set_msg("ARK ENERGY RECHARGED");

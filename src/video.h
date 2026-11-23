@@ -39,19 +39,47 @@ void txt_center(uint8_t row, const char *s, uint8_t fg, uint8_t bg);
 void txt_num(uint8_t col, uint8_t row, uint32_t val, uint8_t width, uint8_t fg, uint8_t bg);
 void txt_box(uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t fg, uint8_t bg);
 
-/* Top HUD (2 rows, y=0..15) and Bottom HUD (2 rows, y=224..239) */
+/* Custom 4bpp HUD Tile IDs (matching tools/gen_art.py make_hud_tiles) */
+#define HT_PANEL      0u
+#define HT_TOP_RIM    1u
+#define HT_BOT_RIM    2u
+#define HT_DIV        3u
+#define HT_BAR_EMPTY  4u
+#define HT_BAR_L      5u
+#define HT_BAR_R      6u
+#define HT_BAR_GREEN  7u  /* 7..10 */
+#define HT_BAR_GOLD   11u /* 11..14 */
+#define HT_BAR_RED    15u /* 15..18 */
+#define HT_BAR_CYAN   19u /* 19..22 */
+#define HT_ICO_BOLT   23u
+#define HT_ICO_SAUCER 24u
+#define HT_ICO_BIO_LO 25u
+#define HT_ICO_BIO_HI 26u
+#define HT_ICO_CRATE  27u
+#define HT_RAD_EMPTY  28u
+#define HT_RAD_L      29u
+#define HT_RAD_R      30u
+#define HT_RAD_TOWER  31u
+#define HT_RAD_ARK    32u
+#define HT_RAD_BIO    33u
+#define HT_RAD_SHU    34u
+#define HT_RAD_RELIC  35u
+#define HT_RAD_STORM  36u
+
+/* Top HUD (2 rows, y=0..15) and Bottom HUD (2 rows, y=224..239):
+ * 4bpp graphical tile layer underneath + transparent Mode 1 text overlay */
 void hud_top_clear(void);
+void hud_top_tile(uint8_t col, uint8_t row, uint8_t tile);
 void hud_top_put(uint8_t col, uint8_t row, uint8_t ch, uint8_t fg, uint8_t bg);
 void hud_top_str(uint8_t col, uint8_t row, const char *s, uint8_t fg);
 void hud_top_num(uint8_t col, uint8_t row, uint32_t val, uint8_t width, uint8_t fg);
-void hud_top_bar(uint8_t col, uint8_t row, uint8_t cells, uint8_t val, uint8_t maxv,
-                 uint8_t fg_hi, uint8_t fg_lo);
+void hud_top_bar(uint8_t col, uint8_t row, uint8_t cells, uint8_t val, uint8_t maxv, bool is_cyan);
 
 void hud_bot_clear(void);
+void hud_bot_tile(uint8_t col, uint8_t row, uint8_t tile);
 void hud_bot_put(uint8_t col, uint8_t row, uint8_t ch, uint8_t fg, uint8_t bg);
 void hud_bot_str(uint8_t col, uint8_t row, const char *s, uint8_t fg);
-void hud_bot_bar(uint8_t col, uint8_t row, uint8_t cells, uint8_t val, uint8_t maxv,
-                 uint8_t fg_hi, uint8_t fg_lo);
+void hud_bot_bar(uint8_t col, uint8_t row, uint8_t cells, uint8_t val, uint8_t maxv, bool is_cyan);
 
 /* Center message overlay (4 rows at MSG_Y) */
 void msg_clear(void);

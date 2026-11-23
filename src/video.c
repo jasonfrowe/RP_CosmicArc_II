@@ -12,10 +12,12 @@ mode5_csprite_t spr[SPR_TOTAL_COUNT];
 static mode1_4bpp_data_t hud_top_buf[HUD_TOP_ROWS][TXT_COLS];
 static mode1_4bpp_data_t hud_bot_buf[HUD_BOT_ROWS][TXT_COLS];
 static mode1_4bpp_data_t msg_buf[MSG_ROWS][TXT_COLS];
+static uint8_t hud_top_bg[HUD_TOP_ROWS][TXT_COLS];
+static uint8_t hud_bot_bg[HUD_BOT_ROWS][TXT_COLS];
 
 static bool hud_top_dirty, hud_bot_dirty, msg_dirty, spr_dirty;
 static uint8_t msg_timer;
-static mode2_config_t bg0_cfg, bg1_cfg;
+static mode2_config_t bg0_cfg, bg1_cfg, hud_top_bg_cfg, hud_bot_bg_cfg;
 static bool scroll_dirty;
 
 static void put_cell(mode1_4bpp_data_t *c, uint8_t ch, uint8_t fg, uint8_t bg)
@@ -80,6 +82,23 @@ void video_init(void)
     write_mode1_cfg(XRAM_HUD_BOT_CONFIG, 224, TXT_COLS, HUD_BOT_ROWS, XRAM_HUD_BOT);
     write_mode1_cfg(XRAM_MSG_CONFIG, MSG_Y, TXT_COLS, MSG_ROWS, XRAM_MSG);
 
+    /* Init 4bpp graphical HUD tilemap configs */
+    hud_top_bg_cfg.x_wrap = false;
+    hud_top_bg_cfg.y_wrap = false;
+    hud_top_bg_cfg.x_pos_px = 0;
+    hud_top_bg_cfg.y_pos_px = 0;
+    hud_top_bg_cfg.width_tiles = TXT_COLS;
+    hud_top_bg_cfg.height_tiles = HUD_TOP_ROWS;
+    hud_top_bg_cfg.xram_data_ptr = XRAM_MAP_HUD_TOP;
+    hud_top_bg_cfg.xram_palette_ptr = PAL_ADDR(PAL_HUD);
+    hud_top_bg_cfg.xram_tile_ptr = XRAM_TILES_HUD;
+    xram0_write(XRAM_HUD_TOP_BG_CFG, &hud_top_bg_cfg, sizeof(hud_top_bg_cfg));
+
+    hud_bot_bg_cfg = hud_top_bg_cfg;
+    hud_bot_bg_cfg.y_pos_px = 224;
+    hud_bot_bg_cfg.xram_data_ptr = XRAM_MAP_HUD_BOT;
+    xram0_write(XRAM_HUD_BOT_BG_CFG, &hud_bot_bg_cfg, sizeof(hud_bot_bg_cfg));
+
     spr_hide_all();
     txt_clear(C_TRANS);
     hud_top_clear();
@@ -132,7 +151,8 @@ void video_set_mode(vid_mode_t mode, uint8_t world_idx)
         bg0_cfg.xram_tile_ptr = XRAM_TILES_SPACE;
         xram0_write(XRAM_BG0_CONFIG, &bg0_cfg, sizeof(bg0_cfg));
 
-        xreg_vga_mode2(MODE2_4BPP | MODE2_8X8, XRAM_BG0_CONFIG, 0, 0, SCREEN_H);
+        xreg_vga_mode2(MODE2_4BPP | MODE2_8X8, XRAM_HUD_TOP_BG_CFG, 0, 0, 16);
+        xreg_vga_mode2(MODE2_4BPP | MODE2_8X8, XRAM_BG0_CONFIG, 0, 16, SCREEN_H);
         xreg_vga_mode5(MODE5_CUSTOM, XRAM_SPR, SPR_TOTAL_COUNT, 1, 16, SCREEN_H);
         xreg_vga_mode1(MODE1_4BPP | MODE1_8X8, XRAM_HUD_TOP_CONFIG, 2, 0, 16);
         xreg_vga_mode1(MODE1_4BPP | MODE1_8X8, XRAM_MSG_CONFIG, 2, MSG_Y, MSG_Y + MSG_ROWS * 8);
@@ -162,7 +182,9 @@ void video_set_mode(vid_mode_t mode, uint8_t world_idx)
         bg1_cfg.xram_tile_ptr = XRAM_TILES_PLANET;
         xram0_write(XRAM_BG1_CONFIG, &bg1_cfg, sizeof(bg1_cfg));
 
+        xreg_vga_mode2(MODE2_4BPP | MODE2_8X8, XRAM_HUD_TOP_BG_CFG, 0, 0, 16);
         xreg_vga_mode2(MODE2_4BPP | MODE2_8X8, XRAM_BG0_CONFIG, 0, 16, 224);
+        xreg_vga_mode2(MODE2_4BPP | MODE2_8X8, XRAM_HUD_BOT_BG_CFG, 0, 224, 240);
         xreg_vga_mode2(MODE2_4BPP | MODE2_8X8, XRAM_BG1_CONFIG, 1, 16, 224);
         xreg_vga_mode5(MODE5_CUSTOM, XRAM_SPR, SPR_TOTAL_COUNT, 2, 16, 224);
         xreg_vga_mode1(MODE1_4BPP | MODE1_8X8, XRAM_HUD_TOP_CONFIG, 2, 0, 16);
@@ -215,10 +237,12 @@ void video_commit(void)
         scroll_dirty = false;
     }
     if (hud_top_dirty) {
+        xram0_write(XRAM_MAP_HUD_TOP, hud_top_bg, sizeof(hud_top_bg));
         xram0_write(XRAM_HUD_TOP, hud_top_buf, sizeof(hud_top_buf));
         hud_top_dirty = false;
     }
     if (hud_bot_dirty) {
+        xram0_write(XRAM_MAP_HUD_BOT, hud_bot_bg, sizeof(hud_bot_bg));
         xram0_write(XRAM_HUD_BOT, hud_bot_buf, sizeof(hud_bot_buf));
         hud_bot_dirty = false;
     }
@@ -356,15 +380,26 @@ void txt_box(uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t fg, uint8_t bg)
 }
 
 /* ------------------------------------------------------------------ */
-/* HUD Top / Bottom & Message Banner                                  */
+/* HUD Top / Bottom (4bpp Tile Panel + Transparent Mode 1 Overlay)    */
 /* ------------------------------------------------------------------ */
 
 void hud_top_clear(void)
 {
-    for (uint8_t r = 0; r < HUD_TOP_ROWS; r++)
-        for (uint8_t c = 0; c < TXT_COLS; c++)
-            put_cell(&hud_top_buf[r][c], ' ', C_WHITE, C_PANEL);
+    for (uint8_t c = 0; c < TXT_COLS; c++) {
+        hud_top_bg[0][c] = HT_PANEL;
+        hud_top_bg[1][c] = HT_TOP_RIM;
+        put_cell(&hud_top_buf[0][c], ' ', C_WHITE, C_TRANS);
+        put_cell(&hud_top_buf[1][c], ' ', C_WHITE, C_TRANS);
+    }
     hud_top_dirty = true;
+}
+
+void hud_top_tile(uint8_t col, uint8_t row, uint8_t tile)
+{
+    if (col < TXT_COLS && row < HUD_TOP_ROWS) {
+        hud_top_bg[row][col] = tile;
+        hud_top_dirty = true;
+    }
 }
 
 void hud_top_put(uint8_t col, uint8_t row, uint8_t ch, uint8_t fg, uint8_t bg)
@@ -379,7 +414,7 @@ void hud_top_str(uint8_t col, uint8_t row, const char *s, uint8_t fg)
 {
     if (row >= HUD_TOP_ROWS) return;
     while (*s && col < TXT_COLS)
-        put_cell(&hud_top_buf[row][col++], (uint8_t)*s++, fg, C_PANEL);
+        put_cell(&hud_top_buf[row][col++], (uint8_t)*s++, fg, C_TRANS);
     hud_top_dirty = true;
 }
 
@@ -390,45 +425,52 @@ void hud_top_num(uint8_t col, uint8_t row, uint32_t val, uint8_t width, uint8_t 
     hud_top_str(col, row, buf, fg);
 }
 
-static void draw_bar(mode1_4bpp_data_t *row_ptr, uint8_t col, uint8_t cells,
-                     uint8_t val, uint8_t maxv, uint8_t fg_hi, uint8_t fg_lo)
+static void draw_tile_bar(uint8_t *bg_row, uint8_t col, uint8_t cells,
+                          uint8_t val, uint8_t maxv, bool is_cyan)
 {
     if (maxv == 0) maxv = 1;
-    uint16_t filled = (uint16_t)val * cells * 2u / maxv;
-    uint8_t fg = ((uint16_t)val * 4u <= maxv) ? fg_lo :
-                 (((uint16_t)val * 2u <= maxv) ? C_GOLD : fg_hi);
+    uint16_t steps = (uint16_t)val * cells * 4u / maxv;
+    uint8_t base = is_cyan ? HT_BAR_CYAN :
+                   (((uint16_t)val * 4u <= maxv) ? HT_BAR_RED :
+                   (((uint16_t)val * 2u <= maxv) ? HT_BAR_GOLD : HT_BAR_GREEN));
     for (uint8_t i = 0; i < cells && (col + i) < TXT_COLS; i++) {
-        uint8_t ch;
-        uint8_t c = fg;
-        if (filled >= 2) {
-            ch = 219; /* full block */
-            filled -= 2;
-        } else if (filled == 1) {
-            ch = 221; /* half block */
-            filled = 0;
+        if (steps >= 4) {
+            bg_row[col + i] = (uint8_t)(base + 3u);
+            steps -= 4;
+        } else if (steps > 0) {
+            bg_row[col + i] = (uint8_t)(base + steps - 1u);
+            steps = 0;
         } else {
-            ch = 176; /* subtle recessed grid */
-            c = C_DIM;
+            bg_row[col + i] = HT_BAR_EMPTY;
         }
-        put_cell(&row_ptr[col + i], ch, c, C_FRAME);
     }
 }
 
-void hud_top_bar(uint8_t col, uint8_t row, uint8_t cells, uint8_t val, uint8_t maxv,
-                 uint8_t fg_hi, uint8_t fg_lo)
+void hud_top_bar(uint8_t col, uint8_t row, uint8_t cells, uint8_t val, uint8_t maxv, bool is_cyan)
 {
     if (row < HUD_TOP_ROWS) {
-        draw_bar(hud_top_buf[row], col, cells, val, maxv, fg_hi, fg_lo);
+        draw_tile_bar(hud_top_bg[row], col, cells, val, maxv, is_cyan);
         hud_top_dirty = true;
     }
 }
 
 void hud_bot_clear(void)
 {
-    for (uint8_t r = 0; r < HUD_BOT_ROWS; r++)
-        for (uint8_t c = 0; c < TXT_COLS; c++)
-            put_cell(&hud_bot_buf[r][c], ' ', C_WHITE, C_PANEL);
+    for (uint8_t c = 0; c < TXT_COLS; c++) {
+        hud_bot_bg[0][c] = HT_BOT_RIM;
+        hud_bot_bg[1][c] = HT_PANEL;
+        put_cell(&hud_bot_buf[0][c], ' ', C_WHITE, C_TRANS);
+        put_cell(&hud_bot_buf[1][c], ' ', C_WHITE, C_TRANS);
+    }
     hud_bot_dirty = true;
+}
+
+void hud_bot_tile(uint8_t col, uint8_t row, uint8_t tile)
+{
+    if (col < TXT_COLS && row < HUD_BOT_ROWS) {
+        hud_bot_bg[row][col] = tile;
+        hud_bot_dirty = true;
+    }
 }
 
 void hud_bot_put(uint8_t col, uint8_t row, uint8_t ch, uint8_t fg, uint8_t bg)
@@ -443,15 +485,14 @@ void hud_bot_str(uint8_t col, uint8_t row, const char *s, uint8_t fg)
 {
     if (row >= HUD_BOT_ROWS) return;
     while (*s && col < TXT_COLS)
-        put_cell(&hud_bot_buf[row][col++], (uint8_t)*s++, fg, C_PANEL);
+        put_cell(&hud_bot_buf[row][col++], (uint8_t)*s++, fg, C_TRANS);
     hud_bot_dirty = true;
 }
 
-void hud_bot_bar(uint8_t col, uint8_t row, uint8_t cells, uint8_t val, uint8_t maxv,
-                 uint8_t fg_hi, uint8_t fg_lo)
+void hud_bot_bar(uint8_t col, uint8_t row, uint8_t cells, uint8_t val, uint8_t maxv, bool is_cyan)
 {
     if (row < HUD_BOT_ROWS) {
-        draw_bar(hud_bot_buf[row], col, cells, val, maxv, fg_hi, fg_lo);
+        draw_tile_bar(hud_bot_bg[row], col, cells, val, maxv, is_cyan);
         hud_bot_dirty = true;
     }
 }

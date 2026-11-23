@@ -396,55 +396,44 @@ static void space_hud_draw(void)
 {
     hud_top_clear();
 
-    /* Row 0: Credits | Wave | Ark Energy gauge | Fighter Tether gauge */
-    hud_top_put(0, 0, 4, C_GOLD, C_PANEL); /* diamond */
-    hud_top_put(1, 0, '$', C_GOLD, C_PANEL);
+    /* Row 0: Credits | Wave | Graphical 4bpp Energy Bar | Graphical 4bpp Fighter Tether Bar */
+    hud_top_str(1, 0, "$", C_GOLD);
     hud_top_num(2, 0, g_voy.credits, 5, C_WHITE);
-    hud_top_put(7, 0, 179, C_FRAME, C_PANEL);
+    hud_top_tile(8, 0, HT_DIV);
 
-    hud_top_put(8, 0, 'W', C_CYAN, C_FRAME);
-    hud_top_put(9, 0, (uint8_t)('0' + s_wave / 10), C_WHITE, C_FRAME);
-    hud_top_put(10, 0, (uint8_t)('0' + s_wave % 10), C_WHITE, C_FRAME);
-    hud_top_put(11, 0, 179, C_FRAME, C_PANEL);
+    hud_top_str(9, 0, "W", C_CYAN);
+    hud_top_num(10, 0, s_wave, 2, C_WHITE);
+    hud_top_tile(12, 0, HT_DIV);
 
-    hud_top_put(12, 0, 3, C_GREEN, C_PANEL); /* heart/hull */
-    hud_top_put(13, 0, '[', C_CYAN, C_PANEL);
-    hud_top_bar(14, 0, 11, g_voy.energy, voy_hull_max(), C_GREEN, C_RED);
-    hud_top_put(25, 0, ']', C_CYAN, C_PANEL);
-    hud_top_put(26, 0, 179, C_FRAME, C_PANEL);
+    /* Ark Energy gauge (lightning icon + beveled 4bpp bar) */
+    hud_top_tile(13, 0, HT_ICO_BOLT);
+    hud_top_tile(14, 0, HT_BAR_L);
+    hud_top_bar(15, 0, 10, g_voy.energy, voy_hull_max(), false);
+    hud_top_tile(25, 0, HT_BAR_R);
+    hud_top_tile(26, 0, HT_DIV);
 
-    hud_top_put(27, 0, 30, C_CYAN, C_PANEL); /* fighter triangle */
-    hud_top_put(28, 0, '[', C_CYAN, C_PANEL);
+    /* Fighter Tether gauge (mini saucer icon + beveled 4bpp cyan bar) */
+    hud_top_tile(27, 0, HT_ICO_SAUCER);
     if (ft_st == FT_DEAD) {
         hud_top_str(29, 0, "REBUILDING", (g_frame & 8u) ? C_RED : C_ORANGE);
     } else {
-        hud_top_bar(29, 0, 10, ft_teth, FT_TETH_MAX, C_CYAN, C_ORANGE);
+        hud_top_tile(28, 0, HT_BAR_L);
+        hud_top_bar(29, 0, 9, ft_teth, FT_TETH_MAX, true);
+        hud_top_tile(38, 0, HT_BAR_R);
     }
-    hud_top_put(39, 0, ']', C_CYAN, C_PANEL);
 
-    /* Row 1: Framed tactical rail */
-    for (uint8_t c = 0; c < 40; c++)
-        hud_top_put(c, 1, 196, C_FRAME, C_PANEL);
+    /* Row 1: Clean status strip over beveled cyan-rimmed cockpit bar */
     if (ft_st == FT_OUT) {
-        hud_top_put(2, 1, 16, C_CYAN, C_PANEL);
-        hud_top_str(3, 1, " FIGHTER ACTIVE ", C_CYAN);
-        hud_top_str(21, 1, " [X] RECALL ", C_GOLD);
-        hud_top_put(33, 1, 17, C_CYAN, C_PANEL);
+        hud_top_str(4, 1, "FIGHTER ACTIVE", C_CYAN);
+        hud_top_str(24, 1, "[X] RECALL", C_GOLD);
     } else if (ft_st == FT_HOMING) {
-        hud_top_put(7, 1, 16, C_GOLD, C_PANEL);
-        hud_top_str(8, 1, " FIGHTER RETURNING HOME ", C_GOLD);
-        hud_top_put(32, 1, 17, C_GOLD, C_PANEL);
+        hud_top_str(10, 1, "FIGHTER RETURNING...", C_GOLD);
     } else if (s_pr_window > 0) {
-        uint8_t c = (g_frame & 8u) ? C_RED : C_GOLD;
-        hud_top_put(1, 1, 174, c, C_PANEL);
-        hud_top_str(2, 1, " PIRATES! ", c);
-        hud_top_str(13, 1, " [X] LAUNCH FIGHTER ", C_CYAN);
-        hud_top_put(33, 1, 175, c, C_PANEL);
+        hud_top_str(3, 1, "PIRATES!", (g_frame & 8u) ? C_RED : C_GOLD);
+        hud_top_str(18, 1, "[X] LAUNCH FIGHTER", C_CYAN);
     } else {
-        hud_top_put(2, 1, 16, C_TEAL, C_PANEL);
-        hud_top_str(3, 1, " ARK DEFENSE ", C_WHITE);
-        hud_top_str(17, 1, " [X] LAUNCH FIGHTER ", C_GOLD);
-        hud_top_put(37, 1, 17, C_TEAL, C_PANEL);
+        hud_top_str(4, 1, "ARK DEFENSE", C_GREY);
+        hud_top_str(18, 1, "[X] LAUNCH FIGHTER", C_GOLD);
     }
 }
 
@@ -1006,6 +995,26 @@ static void update_spawner(void)
 /* Render Sprites                                                     */
 /* ------------------------------------------------------------------ */
 
+/* Map 8-way binary angle (0=R, 32=DR, 64=D, 96=DL, 128=L, 160=UL, 192=U, 224=UR)
+ * to 3 base sprite frames (0=R, 1=U, 2=UR) + Mode 5 HFLIP/VFLIP */
+static void angle_to_frame_opt(uint8_t ang, uint8_t *frame, uint8_t *opt)
+{
+    uint8_t d = (uint8_t)(((ang + 16u) >> 5) & 7u);
+    static const uint8_t f_tbl[8] = { 0, 2, 1, 2, 0, 2, 1, 2 };
+    static const uint8_t o_tbl[8] = {
+        MODE5_4BPP,                             /* 0: R  */
+        MODE5_4BPP | MODE5_VFLIP,               /* 1: DR */
+        MODE5_4BPP | MODE5_VFLIP,               /* 2: D  */
+        MODE5_4BPP | MODE5_HFLIP | MODE5_VFLIP, /* 3: DL */
+        MODE5_4BPP | MODE5_HFLIP,               /* 4: L  */
+        MODE5_4BPP | MODE5_HFLIP,               /* 5: UL */
+        MODE5_4BPP,                             /* 6: U  */
+        MODE5_4BPP,                             /* 7: UR */
+    };
+    *frame = f_tbl[d];
+    *opt = o_tbl[d];
+}
+
 static void space_render(void)
 {
     uint8_t idx = 0;
@@ -1030,34 +1039,51 @@ static void space_render(void)
                   FROM_FP(ft_x) - (int16_t)(SAUCER_W / 2), FROM_FP(ft_y) - (int16_t)(SAUCER_H / 2));
     }
 
+    /* Jagged tumbling 4-frame asteroids */
     for (uint8_t i = 0; i < MAX_ROCKS && idx < SPR_TOTAL_COUNT; i++) {
         rock_t *r = &rocks[i];
         if (r->type == RK_FREE) continue;
-        uint8_t f = (r->anim >> 3) & 1u;
+        uint8_t f = (r->anim >> 3) & 3u;
         int16_t rx = FROM_FP(r->x), ry = FROM_FP(r->y);
         if (r->type == RK_L)
             spr_place(idx++, (uint16_t)(XRAM_IMG_ROCK_L + f * ROCK_L_FRAME_BYTES), PAL_ROCK,
-                      MODE5_SIZE(16, 16), MODE5_4BPP, rx - 8, ry - 8);
+                      MODE5_SIZE(ROCK_L_W, ROCK_L_H), MODE5_4BPP, rx - 10, ry - 10);
         else if (r->type == RK_M)
             spr_place(idx++, (uint16_t)(XRAM_IMG_ROCK_M + f * ROCK_M_FRAME_BYTES), PAL_ROCK,
-                      MODE5_SIZE(12, 12), MODE5_4BPP, rx - 6, ry - 6);
+                      MODE5_SIZE(ROCK_M_W, ROCK_M_H), MODE5_4BPP, rx - 8, ry - 8);
         else
             spr_place(idx++, (uint16_t)(XRAM_IMG_ROCK_S + f * ROCK_S_FRAME_BYTES), PAL_ROCK,
-                      MODE5_SIZE(8, 8), MODE5_4BPP, rx - 4, ry - 4);
+                      MODE5_SIZE(ROCK_S_W, ROCK_S_H), MODE5_4BPP, rx - 4, ry - 4);
     }
 
+    /* Directional 8-way Raiders, heavy Gunships, and directional 8-way Missiles */
     for (uint8_t i = 0; i < MAX_PIRATES && idx < SPR_TOTAL_COUNT; i++) {
         pirate_t *p = &pirates[i];
         if (p->type == PR_FREE) continue;
-        uint8_t f = (p->type == PR_RAID) ? 0 : (p->type == PR_GUN ? 1 : 2);
-        spr_place(idx++, (uint16_t)(XRAM_IMG_PIRATES + f * PIRATES_FRAME_BYTES), PAL_PIRATE,
-                  MODE5_SIZE(16, 16), MODE5_4BPP, FROM_FP(p->x) - 8, FROM_FP(p->y) - 8);
+        int16_t px = FROM_FP(p->x), py = FROM_FP(p->y);
+        if (p->type == PR_RAID) {
+            uint8_t f, opt;
+            angle_to_frame_opt(p->ang, &f, &opt);
+            spr_place(idx++, (uint16_t)(XRAM_IMG_RAIDER + f * RAIDER_FRAME_BYTES), PAL_PIRATE,
+                      MODE5_SIZE(RAIDER_W, RAIDER_H), opt, px - 8, py - 8);
+        } else if (p->type == PR_GUN) {
+            uint8_t f = (g_frame >> 3) & 1u;
+            spr_place(idx++, (uint16_t)(XRAM_IMG_GUNSHIP + f * GUNSHIP_FRAME_BYTES), PAL_PIRATE,
+                      MODE5_SIZE(GUNSHIP_W, GUNSHIP_H), MODE5_4BPP, px - 10, py - 10);
+        } else {
+            uint8_t f, opt;
+            angle_to_frame_opt(p->ang, &f, &opt);
+            spr_place(idx++, (uint16_t)(XRAM_IMG_MISSILE + f * MISSILE_FRAME_BYTES), PAL_PIRATE,
+                      MODE5_SIZE(MISSILE_W, MISSILE_H), opt, px - 6, py - 6);
+        }
     }
 
+    /* Pulsing Salvage Pods */
     for (uint8_t i = 0; i < MAX_PODS && idx < SPR_TOTAL_COUNT; i++) {
         if (pods[i].life == 0) continue;
-        spr_place(idx++, (uint16_t)(XRAM_IMG_PIRATES + 3u * PIRATES_FRAME_BYTES), PAL_PIRATE,
-                  MODE5_SIZE(16, 16), MODE5_4BPP, FROM_FP(pods[i].x) - 8, FROM_FP(pods[i].y) - 8);
+        uint8_t f = (g_frame >> 3) & 1u;
+        spr_place(idx++, (uint16_t)(XRAM_IMG_POD + f * POD_FRAME_BYTES), PAL_PIRATE,
+                  MODE5_SIZE(POD_W, POD_H), MODE5_4BPP, FROM_FP(pods[i].x) - 6, FROM_FP(pods[i].y) - 6);
     }
 
     for (uint8_t i = 0; i < MAX_BOLTS && idx < SPR_TOTAL_COUNT; i++) {

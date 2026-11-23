@@ -133,7 +133,7 @@ typedef struct {
 /* Layer & Sprite Dimensions                                          */
 /* ------------------------------------------------------------------ */
 
-#define SPR_TOTAL_COUNT 64
+#define SPR_TOTAL_COUNT 48
 
 /* Fullscreen 40x30 Mode 1 text buffer (used for menus, map, chart, port, achievements) */
 #define TXT_COLS 40
@@ -177,6 +177,8 @@ typedef struct {
     /* Video configuration structs (even-aligned) */
     mode2_config_t bg0_config;
     mode2_config_t bg1_config;
+    mode2_config_t hud_top_bg_config;
+    mode2_config_t hud_bot_bg_config;
     mode1_config_t txt_config;
     mode1_config_t hud_top_config;
     mode1_config_t hud_bot_config;
@@ -200,7 +202,10 @@ typedef struct {
     uint8_t img_rock_m[ROCK_M_TOTAL_BYTES];
     uint8_t img_rock_s[ROCK_S_TOTAL_BYTES];
     uint8_t img_saucer[SAUCER_TOTAL_BYTES];
-    uint8_t img_pirates[PIRATES_TOTAL_BYTES];
+    uint8_t img_raider[RAIDER_TOTAL_BYTES];
+    uint8_t img_gunship[GUNSHIP_TOTAL_BYTES];
+    uint8_t img_missile[MISSILE_TOTAL_BYTES];
+    uint8_t img_pod[POD_TOTAL_BYTES];
     uint8_t img_shots[SHOTS_TOTAL_BYTES];
     uint8_t img_boom[BOOM_TOTAL_BYTES];
     uint8_t img_creatures[CREATURES_TOTAL_BYTES];
@@ -212,11 +217,14 @@ typedef struct {
 
     uint8_t tiles_space[TILES_SPACE_TOTAL_BYTES];
     uint8_t tiles_planet[TILES_PLANET_TOTAL_BYTES];
+    uint8_t tiles_hud[TILES_HUD_TOTAL_BYTES];
 
     /* Tilemaps (filled dynamically in XRAM) */
     uint8_t map_space[SPACE_MAP_ROWS][SPACE_MAP_COLS];
     uint8_t map_psky[PSKY_MAP_ROWS][PSKY_MAP_COLS];
     uint8_t map_pgnd[PGND_MAP_ROWS][PGND_MAP_COLS];
+    uint8_t map_hud_top[HUD_TOP_ROWS][TXT_COLS];
+    uint8_t map_hud_bot[HUD_BOT_ROWS][TXT_COLS];
 
     /* OPL2 SFX blob loaded by ROM */
     uint8_t sfx_data[SFX_DATA_MAX];
@@ -229,6 +237,8 @@ _Static_assert((XRAM_OPL & 0xFF) == 0, "OPL2 must be on a page boundary");
 #define XRAM_GAMEPAD        offsetof(xram_layout_t, gamepad)
 #define XRAM_BG0_CONFIG     offsetof(xram_layout_t, bg0_config)
 #define XRAM_BG1_CONFIG     offsetof(xram_layout_t, bg1_config)
+#define XRAM_HUD_TOP_BG_CFG offsetof(xram_layout_t, hud_top_bg_config)
+#define XRAM_HUD_BOT_BG_CFG offsetof(xram_layout_t, hud_bot_bg_config)
 #define XRAM_TXT_CONFIG     offsetof(xram_layout_t, txt_config)
 #define XRAM_HUD_TOP_CONFIG offsetof(xram_layout_t, hud_top_config)
 #define XRAM_HUD_BOT_CONFIG offsetof(xram_layout_t, hud_bot_config)
@@ -245,7 +255,10 @@ _Static_assert((XRAM_OPL & 0xFF) == 0, "OPL2 must be on a page boundary");
 #define XRAM_IMG_ROCK_M     offsetof(xram_layout_t, img_rock_m)
 #define XRAM_IMG_ROCK_S     offsetof(xram_layout_t, img_rock_s)
 #define XRAM_IMG_SAUCER     offsetof(xram_layout_t, img_saucer)
-#define XRAM_IMG_PIRATES    offsetof(xram_layout_t, img_pirates)
+#define XRAM_IMG_RAIDER     offsetof(xram_layout_t, img_raider)
+#define XRAM_IMG_GUNSHIP    offsetof(xram_layout_t, img_gunship)
+#define XRAM_IMG_MISSILE    offsetof(xram_layout_t, img_missile)
+#define XRAM_IMG_POD        offsetof(xram_layout_t, img_pod)
 #define XRAM_IMG_SHOTS      offsetof(xram_layout_t, img_shots)
 #define XRAM_IMG_BOOM       offsetof(xram_layout_t, img_boom)
 #define XRAM_IMG_CREATURES  offsetof(xram_layout_t, img_creatures)
@@ -257,9 +270,12 @@ _Static_assert((XRAM_OPL & 0xFF) == 0, "OPL2 must be on a page boundary");
 
 #define XRAM_TILES_SPACE    offsetof(xram_layout_t, tiles_space)
 #define XRAM_TILES_PLANET   offsetof(xram_layout_t, tiles_planet)
+#define XRAM_TILES_HUD      offsetof(xram_layout_t, tiles_hud)
 #define XRAM_MAP_SPACE      offsetof(xram_layout_t, map_space)
 #define XRAM_MAP_PSKY       offsetof(xram_layout_t, map_psky)
 #define XRAM_MAP_PGND       offsetof(xram_layout_t, map_pgnd)
+#define XRAM_MAP_HUD_TOP    offsetof(xram_layout_t, map_hud_top)
+#define XRAM_MAP_HUD_BOT    offsetof(xram_layout_t, map_hud_bot)
 #define XRAM_SFX_DATA       offsetof(xram_layout_t, sfx_data)
 
 #define PAL_ADDR(p) (uint16_t)(XRAM_PALETTES + (uint16_t)(p) * sizeof(palette_t))
