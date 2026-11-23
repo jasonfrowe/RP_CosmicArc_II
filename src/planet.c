@@ -315,7 +315,6 @@ static void planet_hud_draw(void)
         C_GREEN, C_RED, C_CYAN, C_MAGENTA, C_GOLD, C_GREEN
     };
 
-    hud_top_clear();
     /* Row 0: Credits | World + Level | Graphical Creature Icons | Storm Status */
     hud_top_str(1, 0, "$", C_GOLD);
     hud_top_num(2, 0, g_voy.credits, 5, C_WHITE);
@@ -334,52 +333,47 @@ static void planet_hud_draw(void)
     hud_top_tile(29, 0, HT_DIV);
 
     if (storm_phase == 0) {
-        hud_top_str(31, 0, "ORBIT OK", C_TEAL);
+        hud_top_str(30, 0, " ORBIT OK", C_TEAL);
     } else {
-        hud_top_str(30, 0, "STORM!!", (g_frame & 8u) ? C_RED : C_GOLD);
+        hud_top_str(30, 0, "STORM!!  ", (g_frame & 8u) ? C_RED : C_GOLD);
     }
 
-    /* Row 1: Custom 4bpp Pixel-Art 24-cell Planetary Radar */
+    /* Row 1: Custom 4bpp Pixel-Art 24-cell Planetary Radar (composed then written in-place) */
     uint8_t sc0 = 8;
     hud_top_str(1, 1, "RADAR", C_CYAN);
     hud_top_tile(sc0 - 1, 1, HT_RAD_L);
     hud_top_tile(sc0 + 24, 1, HT_RAD_R);
-    for (uint8_t i = 0; i < 24; i++)
-        hud_top_tile((uint8_t)(sc0 + i), 1, HT_RAD_EMPTY);
+    uint8_t *rad = g_arena + 224;
+    memset(rad, HT_RAD_EMPTY, 24);
 
-    /* 4 Towers on radar */
     for (uint8_t t = 0; t < NUM_TOWERS; t++) {
         uint8_t cell = (uint8_t)((uint16_t)(TOWER_OFFSET + t * TOWER_SPACING) * 24u / WORLD_W);
-        hud_top_tile((uint8_t)(sc0 + cell), 1, HT_RAD_TOWER);
+        rad[cell] = HT_RAD_TOWER;
     }
-    /* Creatures on radar */
     for (uint8_t i = 0; i < MAX_CREATURES; i++) {
         if (creatures[i].active == 1 || creatures[i].active == 2) {
             uint8_t cell = (uint8_t)((uint16_t)(creatures[i].wx & WORLD_MASK) * 24u / WORLD_W);
-            hud_top_tile((uint8_t)(sc0 + cell), 1, HT_RAD_BIO);
+            rad[cell] = HT_RAD_BIO;
         }
     }
-    /* Relic on radar */
     for (uint8_t i = 0; i < MAX_CRATES; i++) {
         if (crates[i].active && crates[i].is_relic) {
             uint8_t cell = (uint8_t)((uint16_t)(crates[i].wx & WORLD_MASK) * 24u / WORLD_W);
-            hud_top_tile((uint8_t)(sc0 + cell), 1, HT_RAD_RELIC);
+            rad[cell] = HT_RAD_RELIC;
         }
     }
-    /* Ark on radar (center = cell 12) */
-    hud_top_tile((uint8_t)(sc0 + 12), 1, HT_RAD_ARK);
-    /* Shuttle on radar */
+    rad[12] = HT_RAD_ARK;
     if (shu_st != SHU_DEAD) {
         uint8_t cell = (uint8_t)((uint16_t)(shu_wx & WORLD_MASK) * 24u / WORLD_W);
-        hud_top_tile((uint8_t)(sc0 + cell), 1, HT_RAD_SHU);
+        rad[cell] = HT_RAD_SHU;
     }
-    /* Storm rock alert on radar */
     if (storm_phase == 2 && (g_frame & 4u)) {
-        hud_top_tile((uint8_t)(sc0 + 12), 1, HT_RAD_STORM);
+        rad[12] = HT_RAD_STORM;
     }
+    for (uint8_t i = 0; i < 24; i++)
+        hud_top_tile((uint8_t)(sc0 + i), 1, rad[i]);
 
     /* Bottom HUD: Row 0 = 4bpp Energy Bar | Shuttle Bay | Cargo Holds */
-    hud_bot_clear();
     hud_bot_tile(0, 0, HT_ICO_BOLT);
     hud_bot_tile(1, 0, HT_BAR_L);
     hud_bot_bar(2, 0, 10, g_voy.energy, voy_hull_max(), false);
@@ -387,6 +381,7 @@ static void planet_hud_draw(void)
     hud_bot_tile(13, 0, HT_DIV);
 
     hud_bot_tile(14, 0, HT_ICO_SAUCER);
+    hud_bot_str(16, 0, "           ", C_WHITE);
     if (shu_st == SHU_DEAD)
         hud_bot_str(16, 0, "REBUILDING", (g_frame & 8u) ? C_RED : C_ORANGE);
     else if (shu_cargo == CARGO_CREATURE)
@@ -407,13 +402,13 @@ static void planet_hud_draw(void)
     hud_bot_put(38, 0, (uint8_t)('0' + voy_holds_max() / 10), C_CYAN, C_TRANS);
     hud_bot_put(39, 0, (uint8_t)('0' + voy_holds_max() % 10), C_CYAN, C_TRANS);
 
-    /* Row 1: Clean control hints */
+    /* Row 1: Fixed-width control hints (overwrites in-place, zero flicker) */
     if (storm_phase == 1 || storm_phase == 2) {
-        hud_bot_str(4, 1, "STORM! DOCK & FIRE [UP/LT/RT]", (g_frame & 8u) ? C_RED : C_GOLD);
+        hud_bot_str(4, 1, "STORM! DOCK & FIRE [UP/LT/RT]   ", (g_frame & 8u) ? C_RED : C_GOLD);
     } else if (shu_st == SHU_DOCKED) {
-        hud_bot_str(5, 1, "[DOWN] LAUNCH   [HOLD X] LEAVE", C_CYAN);
+        hud_bot_str(4, 1, " [DOWN] LAUNCH   [HOLD B] LEAVE ", C_CYAN);
     } else {
-        hud_bot_str(4, 1, "[Z] BEAM   [X] DROP   [UP] DOCK", C_GREY);
+        hud_bot_str(4, 1, "[A] BEAM   [B] DROP   [UP] DOCK ", C_GREY);
     }
 }
 
@@ -495,6 +490,8 @@ void planet_enter(uint8_t world_idx, uint8_t level, uint8_t pop, bool has_relic,
     }
 
     video_set_planet_scroll((int16_t)(shu_wx - SCREEN_W / 2));
+    hud_top_clear();
+    hud_bot_clear();
     planet_hud_draw();
     music_play("ROM:Planet.vgm");
 }

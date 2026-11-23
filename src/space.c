@@ -394,8 +394,6 @@ static void fighter_hurt(uint8_t dmg)
 
 static void space_hud_draw(void)
 {
-    hud_top_clear();
-
     /* Row 0: Credits | Wave | Graphical 4bpp Energy Bar | Graphical 4bpp Fighter Tether Bar */
     hud_top_str(1, 0, "$", C_GOLD);
     hud_top_num(2, 0, g_voy.credits, 5, C_WHITE);
@@ -415,26 +413,24 @@ static void space_hud_draw(void)
     /* Fighter Tether gauge (mini saucer icon + beveled 4bpp cyan bar) */
     hud_top_tile(27, 0, HT_ICO_SAUCER);
     if (ft_st == FT_DEAD) {
+        for (uint8_t c = 28; c <= 38; c++) hud_top_tile(c, 0, HT_PANEL);
         hud_top_str(29, 0, "REBUILDING", (g_frame & 8u) ? C_RED : C_ORANGE);
     } else {
+        hud_top_str(29, 0, "          ", C_WHITE);
         hud_top_tile(28, 0, HT_BAR_L);
         hud_top_bar(29, 0, 9, ft_teth, FT_TETH_MAX, true);
         hud_top_tile(38, 0, HT_BAR_R);
     }
 
-    /* Row 1: Clean status strip over beveled cyan-rimmed cockpit bar */
-    if (ft_st == FT_OUT) {
-        hud_top_str(4, 1, "FIGHTER ACTIVE", C_CYAN);
-        hud_top_str(24, 1, "[X] RECALL", C_GOLD);
-    } else if (ft_st == FT_HOMING) {
-        hud_top_str(10, 1, "FIGHTER RETURNING...", C_GOLD);
-    } else if (s_pr_window > 0) {
-        hud_top_str(3, 1, "PIRATES!", (g_frame & 8u) ? C_RED : C_GOLD);
-        hud_top_str(18, 1, "[X] LAUNCH FIGHTER", C_CYAN);
-    } else {
-        hud_top_str(4, 1, "ARK DEFENSE", C_GREY);
-        hud_top_str(18, 1, "[X] LAUNCH FIGHTER", C_GOLD);
-    }
+    /* Row 1: Fixed-width status strip (overwrites in-place, zero flicker) */
+    hud_top_str(3, 1,
+        (ft_st == FT_OUT)    ? "FIGHTER ACTIVE    [B] RECALL      " :
+        (ft_st == FT_HOMING) ? "      FIGHTER RETURNING...        " :
+        (s_pr_window > 0)    ? "PIRATES!        [B] LAUNCH FIGHTER" :
+                               "ARK DEFENSE     [B] LAUNCH FIGHTER",
+        (ft_st == FT_OUT)    ? C_CYAN :
+        (ft_st == FT_HOMING) ? C_GOLD :
+        (s_pr_window > 0)    ? ((g_frame & 8u) ? C_RED : C_GOLD) : C_GOLD);
 }
 
 /* ------------------------------------------------------------------ */
@@ -480,6 +476,7 @@ void space_enter(uint8_t wave, bool quick_mode)
     ft_ang = 192;
 
     video_set_mode(VID_MODE_SPACE, 0);
+    hud_top_clear();
     space_hud_draw();
     music_play("ROM:Space.vgm");
 }

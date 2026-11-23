@@ -111,6 +111,31 @@ void video_set_planet_palette(uint8_t world_idx)
     xram0_write(XRAM_BG1_CONFIG, &bg1_cfg, sizeof(bg1_cfg));
 }
 
+static void __attribute__((noinline)) vga_m2(uint16_t cfg, uint8_t plane, int16_t y0, int16_t y1)
+{
+    xreg_vga_mode2(MODE2_4BPP | MODE2_8X8, cfg, plane, y0, y1);
+}
+
+static void __attribute__((noinline)) vga_m1(uint16_t cfg, uint8_t plane, int16_t y0, int16_t y1)
+{
+    xreg_vga_mode1(MODE1_4BPP | MODE1_8X8, cfg, plane, y0, y1);
+}
+
+static void __attribute__((noinline)) set_bg_cfg(mode2_config_t *c, uint16_t addr,
+    bool xw, int16_t y, int16_t wt, int16_t ht, uint16_t data, uint16_t pal, uint16_t tiles)
+{
+    c->x_wrap = xw;
+    c->y_wrap = false;
+    c->x_pos_px = 0;
+    c->y_pos_px = y;
+    c->width_tiles = wt;
+    c->height_tiles = ht;
+    c->xram_data_ptr = data;
+    c->xram_palette_ptr = pal;
+    c->xram_tile_ptr = tiles;
+    xram0_write(addr, c, sizeof(*c));
+}
+
 void video_set_mode(vid_mode_t mode, uint8_t world_idx)
 {
     /* Reset canvas to clear previous plane registrations cleanly */
@@ -118,99 +143,42 @@ void video_set_mode(vid_mode_t mode, uint8_t world_idx)
     spr_hide_all();
     msg_clear();
 
+    if (mode != VID_MODE_PLANET) {
+        set_bg_cfg(&bg0_cfg, XRAM_BG0_CONFIG, true, 0, SPACE_MAP_COLS, SPACE_MAP_ROWS,
+                   XRAM_MAP_SPACE, PAL_ADDR(PAL_SPACE_BG), XRAM_TILES_SPACE);
+    }
+
     if (mode == VID_MODE_MENU) {
-        bg0_cfg.x_wrap = true;
-        bg0_cfg.y_wrap = false;
-        bg0_cfg.x_pos_px = 0;
-        bg0_cfg.y_pos_px = 0;
-        bg0_cfg.width_tiles = SPACE_MAP_COLS;
-        bg0_cfg.height_tiles = SPACE_MAP_ROWS;
-        bg0_cfg.xram_data_ptr = XRAM_MAP_SPACE;
-        bg0_cfg.xram_palette_ptr = PAL_ADDR(PAL_SPACE_BG);
-        bg0_cfg.xram_tile_ptr = XRAM_TILES_SPACE;
-        xram0_write(XRAM_BG0_CONFIG, &bg0_cfg, sizeof(bg0_cfg));
-
-        xreg_vga_mode2(MODE2_4BPP | MODE2_8X8, XRAM_BG0_CONFIG, 0, 0, SCREEN_H);
+        vga_m2(XRAM_BG0_CONFIG, 0, 0, SCREEN_H);
         xreg_vga_mode5(MODE5_CUSTOM, XRAM_SPR, SPR_TOTAL_COUNT, 1, 0, SCREEN_H);
-        xreg_vga_mode1(MODE1_4BPP | MODE1_8X8, XRAM_TXT_CONFIG, 2, 0, SCREEN_H);
+        vga_m1(XRAM_TXT_CONFIG, 2, 0, SCREEN_H);
     } else if (mode == VID_MODE_CHART) {
-        bg0_cfg.x_wrap = true;
-        bg0_cfg.y_wrap = false;
-        bg0_cfg.x_pos_px = 0;
-        bg0_cfg.y_pos_px = 0;
-        bg0_cfg.width_tiles = SPACE_MAP_COLS;
-        bg0_cfg.height_tiles = SPACE_MAP_ROWS;
-        bg0_cfg.xram_data_ptr = XRAM_MAP_SPACE;
-        bg0_cfg.xram_palette_ptr = PAL_ADDR(PAL_SPACE_BG);
-        bg0_cfg.xram_tile_ptr = XRAM_TILES_SPACE;
-        xram0_write(XRAM_BG0_CONFIG, &bg0_cfg, sizeof(bg0_cfg));
-
-        /* Reuse XRAM_MAP_PSKY as 40x17 4bpp graphical Star Chart on Plane 1 (y=32..167) */
-        bg1_cfg.x_wrap = false;
-        bg1_cfg.y_wrap = false;
-        bg1_cfg.x_pos_px = 0;
-        bg1_cfg.y_pos_px = 32;
-        bg1_cfg.width_tiles = TXT_COLS;
-        bg1_cfg.height_tiles = 17;
-        bg1_cfg.xram_data_ptr = XRAM_MAP_PSKY;
-        bg1_cfg.xram_palette_ptr = PAL_ADDR(PAL_HUD);
-        bg1_cfg.xram_tile_ptr = XRAM_TILES_HUD;
-        xram0_write(XRAM_BG1_CONFIG, &bg1_cfg, sizeof(bg1_cfg));
-
-        xreg_vga_mode2(MODE2_4BPP | MODE2_8X8, XRAM_BG0_CONFIG, 0, 0, SCREEN_H);
-        xreg_vga_mode2(MODE2_4BPP | MODE2_8X8, XRAM_BG1_CONFIG, 1, 32, 168);
-        xreg_vga_mode1(MODE1_4BPP | MODE1_8X8, XRAM_TXT_CONFIG, 2, 0, SCREEN_H);
+        set_bg_cfg(&bg1_cfg, XRAM_BG1_CONFIG, false, 32, TXT_COLS, 17,
+                   XRAM_MAP_PSKY, PAL_ADDR(PAL_HUD), XRAM_TILES_HUD);
+        vga_m2(XRAM_BG0_CONFIG, 0, 0, SCREEN_H);
+        vga_m2(XRAM_BG1_CONFIG, 1, 32, 168);
+        vga_m1(XRAM_TXT_CONFIG, 2, 0, SCREEN_H);
     } else if (mode == VID_MODE_SPACE) {
-        bg0_cfg.x_wrap = true;
-        bg0_cfg.y_wrap = false;
-        bg0_cfg.x_pos_px = 0;
-        bg0_cfg.y_pos_px = 0;
-        bg0_cfg.width_tiles = SPACE_MAP_COLS;
-        bg0_cfg.height_tiles = SPACE_MAP_ROWS;
-        bg0_cfg.xram_data_ptr = XRAM_MAP_SPACE;
-        bg0_cfg.xram_palette_ptr = PAL_ADDR(PAL_SPACE_BG);
-        bg0_cfg.xram_tile_ptr = XRAM_TILES_SPACE;
-        xram0_write(XRAM_BG0_CONFIG, &bg0_cfg, sizeof(bg0_cfg));
-
-        xreg_vga_mode2(MODE2_4BPP | MODE2_8X8, XRAM_HUD_TOP_BG_CFG, 0, 0, 16);
-        xreg_vga_mode2(MODE2_4BPP | MODE2_8X8, XRAM_BG0_CONFIG, 0, 16, SCREEN_H);
+        vga_m2(XRAM_HUD_TOP_BG_CFG, 0, 0, 16);
+        vga_m2(XRAM_BG0_CONFIG, 0, 16, SCREEN_H);
         xreg_vga_mode5(MODE5_CUSTOM, XRAM_SPR, SPR_TOTAL_COUNT, 1, 16, SCREEN_H);
-        xreg_vga_mode1(MODE1_4BPP | MODE1_8X8, XRAM_HUD_TOP_CONFIG, 2, 0, 16);
-        xreg_vga_mode1(MODE1_4BPP | MODE1_8X8, XRAM_MSG_CONFIG, 2, MSG_Y, MSG_Y + MSG_ROWS * 8);
+        vga_m1(XRAM_HUD_TOP_CONFIG, 2, 0, 16);
+        vga_m1(XRAM_MSG_CONFIG, 2, MSG_Y, MSG_Y + MSG_ROWS * 8);
     } else if (mode == VID_MODE_PLANET) {
         if (world_idx >= 6) world_idx = 0;
         uint16_t pal = PAL_ADDR(PAL_WORLD_0 + world_idx);
-
-        bg0_cfg.x_wrap = true;
-        bg0_cfg.y_wrap = false;
-        bg0_cfg.x_pos_px = 0;
-        bg0_cfg.y_pos_px = 16;
-        bg0_cfg.width_tiles = PSKY_MAP_COLS;
-        bg0_cfg.height_tiles = PSKY_MAP_ROWS;
-        bg0_cfg.xram_data_ptr = XRAM_MAP_PSKY;
-        bg0_cfg.xram_palette_ptr = pal;
-        bg0_cfg.xram_tile_ptr = XRAM_TILES_PLANET;
-        xram0_write(XRAM_BG0_CONFIG, &bg0_cfg, sizeof(bg0_cfg));
-
-        bg1_cfg.x_wrap = true;
-        bg1_cfg.y_wrap = false;
-        bg1_cfg.x_pos_px = 0;
-        bg1_cfg.y_pos_px = 16;
-        bg1_cfg.width_tiles = PGND_MAP_COLS;
-        bg1_cfg.height_tiles = PGND_MAP_ROWS;
-        bg1_cfg.xram_data_ptr = XRAM_MAP_PGND;
-        bg1_cfg.xram_palette_ptr = pal;
-        bg1_cfg.xram_tile_ptr = XRAM_TILES_PLANET;
-        xram0_write(XRAM_BG1_CONFIG, &bg1_cfg, sizeof(bg1_cfg));
-
-        xreg_vga_mode2(MODE2_4BPP | MODE2_8X8, XRAM_HUD_TOP_BG_CFG, 0, 0, 16);
-        xreg_vga_mode2(MODE2_4BPP | MODE2_8X8, XRAM_BG0_CONFIG, 0, 16, 224);
-        xreg_vga_mode2(MODE2_4BPP | MODE2_8X8, XRAM_HUD_BOT_BG_CFG, 0, 224, 240);
-        xreg_vga_mode2(MODE2_4BPP | MODE2_8X8, XRAM_BG1_CONFIG, 1, 16, 224);
+        set_bg_cfg(&bg0_cfg, XRAM_BG0_CONFIG, true, 16, PSKY_MAP_COLS, PSKY_MAP_ROWS,
+                   XRAM_MAP_PSKY, pal, XRAM_TILES_PLANET);
+        set_bg_cfg(&bg1_cfg, XRAM_BG1_CONFIG, true, 16, PGND_MAP_COLS, PGND_MAP_ROWS,
+                   XRAM_MAP_PGND, pal, XRAM_TILES_PLANET);
+        vga_m2(XRAM_HUD_TOP_BG_CFG, 0, 0, 16);
+        vga_m2(XRAM_BG0_CONFIG, 0, 16, 224);
+        vga_m2(XRAM_HUD_BOT_BG_CFG, 0, 224, 240);
+        vga_m2(XRAM_BG1_CONFIG, 1, 16, 224);
         xreg_vga_mode5(MODE5_CUSTOM, XRAM_SPR, SPR_TOTAL_COUNT, 2, 16, 224);
-        xreg_vga_mode1(MODE1_4BPP | MODE1_8X8, XRAM_HUD_TOP_CONFIG, 2, 0, 16);
-        xreg_vga_mode1(MODE1_4BPP | MODE1_8X8, XRAM_HUD_BOT_CONFIG, 2, 224, 240);
-        xreg_vga_mode1(MODE1_4BPP | MODE1_8X8, XRAM_MSG_CONFIG, 2, MSG_Y, MSG_Y + MSG_ROWS * 8);
+        vga_m1(XRAM_HUD_TOP_CONFIG, 2, 0, 16);
+        vga_m1(XRAM_HUD_BOT_CONFIG, 2, 224, 240);
+        vga_m1(XRAM_MSG_CONFIG, 2, MSG_Y, MSG_Y + MSG_ROWS * 8);
     }
     video_commit();
 }
