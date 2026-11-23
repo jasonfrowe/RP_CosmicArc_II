@@ -9,6 +9,8 @@ frames: 60
 
 A full port of **Cosmic Arc II** (originally built for the Atari 7800 + AstroCart) to the **Picocomputer RP6502**, taking advantage of the RP6502's 8 MHz 65C02 CPU, 320×240 3-plane 4bpp VGA graphics, hardware tilemap scrolling, Yamaha OPL2 FM audio, USB keyboard/gamepad input, and `SAVE:` filesystem persistence.
 
+📖 **[Read the 20-Page Game Manual (5"×7" PDF)](docs/manual/Cosmic_Arc_II_Manual_5x7.pdf)** | [HTML Source](docs/manual/manual.html)
+
 ## Features
 
 - **64-Sector Seeded Galaxy**: 12×8 grid-laid TradeWars-style galaxy with two-way and one-way warps, four threat tiers (Safe Space, Core, Mid-Rim, Outer Rim), 11 starports, planets, nebulae, and the Outer-Rim Relic.
@@ -31,12 +33,14 @@ A full port of **Cosmic Arc II** (originally built for the Atari 7800 + AstroCar
 
 ## Controls
 
-| Action | Keyboard | Gamepad |
+| Action | Gamepad | Keyboard |
 |---|---|---|
-| Move / Aim / Menu | Arrow Keys or `WASD` | D-Pad / Stick |
-| Fire / Tractor Beam / Select | `Z`, `J`, or `Space` | A / R1 |
-| Launch-Recall Fighter / Drop Cargo / Chart / Next Tab | `X`, `K`, `C`, or `Tab` | B / X / L1 |
-| Start / Pause / Leave / Erase Slot | `Enter`, `P`, or `Esc` | Start |
+| Move / Aim / Navigate | D-Pad / Stick | Arrow Keys or `WASD` |
+| Confirm / Fire / Tractor Beam | `A` | `Z`, `J`, `Space`, or `Enter` |
+| Back / Undock / Fighter / Drop Cargo | `B` | `X`, `Esc`, or `Backspace` |
+| Secondary (Keep Specimen / Erase Slot) | `X` / `Y` | `C` or `K` |
+| Previous / Next Page or Tab | `L1` / `R1` | `Q` / `E` (or `[` / `]` / `Tab`) |
+| Return to Title (from Sector) | `START` | `P` |
 
 ## Building & Running
 
