@@ -395,26 +395,57 @@ static void fighter_hurt(uint8_t dmg)
 static void space_hud_draw(void)
 {
     hud_top_clear();
-    hud_top_str(0, 0, "$", C_GOLD);
-    hud_top_num(1, 0, g_voy.credits, 5, C_WHITE);
-    hud_top_str(8, 0, "WV", C_CYAN);
-    hud_top_num(10, 0, s_wave, 2, C_WHITE);
-    hud_top_str(14, 0, "EN", C_GREEN);
-    hud_top_bar(17, 0, 10, g_voy.energy, voy_hull_max(), C_GREEN, C_RED);
-    hud_top_str(29, 0, "FT", C_CYAN);
-    if (ft_st == FT_DEAD)
-        hud_top_str(32, 0, "REBUILD", C_RED);
-    else
-        hud_top_bar(32, 0, 8, ft_teth, FT_TETH_MAX, C_CYAN, C_ORANGE);
 
-    if (ft_st == FT_OUT)
-        hud_top_str(0, 1, "FIGHTER ACTIVE  [X] RECALL", C_CYAN);
-    else if (ft_st == FT_HOMING)
-        hud_top_str(0, 1, "FIGHTER RETURNING...", C_GOLD);
-    else if (s_pr_window > 0)
-        hud_top_str(0, 1, "PIRATE WINDOW!  [X] LAUNCH FIGHTER", C_RED);
-    else
-        hud_top_str(0, 1, "ARK DEFENSE     [X] LAUNCH FIGHTER", C_GREY);
+    /* Row 0: Credits | Wave | Ark Energy gauge | Fighter Tether gauge */
+    hud_top_put(0, 0, 4, C_GOLD, C_PANEL); /* diamond */
+    hud_top_put(1, 0, '$', C_GOLD, C_PANEL);
+    hud_top_num(2, 0, g_voy.credits, 5, C_WHITE);
+    hud_top_put(7, 0, 179, C_FRAME, C_PANEL);
+
+    hud_top_put(8, 0, 'W', C_CYAN, C_FRAME);
+    hud_top_put(9, 0, (uint8_t)('0' + s_wave / 10), C_WHITE, C_FRAME);
+    hud_top_put(10, 0, (uint8_t)('0' + s_wave % 10), C_WHITE, C_FRAME);
+    hud_top_put(11, 0, 179, C_FRAME, C_PANEL);
+
+    hud_top_put(12, 0, 3, C_GREEN, C_PANEL); /* heart/hull */
+    hud_top_put(13, 0, '[', C_CYAN, C_PANEL);
+    hud_top_bar(14, 0, 11, g_voy.energy, voy_hull_max(), C_GREEN, C_RED);
+    hud_top_put(25, 0, ']', C_CYAN, C_PANEL);
+    hud_top_put(26, 0, 179, C_FRAME, C_PANEL);
+
+    hud_top_put(27, 0, 30, C_CYAN, C_PANEL); /* fighter triangle */
+    hud_top_put(28, 0, '[', C_CYAN, C_PANEL);
+    if (ft_st == FT_DEAD) {
+        hud_top_str(29, 0, "REBUILDING", (g_frame & 8u) ? C_RED : C_ORANGE);
+    } else {
+        hud_top_bar(29, 0, 10, ft_teth, FT_TETH_MAX, C_CYAN, C_ORANGE);
+    }
+    hud_top_put(39, 0, ']', C_CYAN, C_PANEL);
+
+    /* Row 1: Framed tactical rail */
+    for (uint8_t c = 0; c < 40; c++)
+        hud_top_put(c, 1, 196, C_FRAME, C_PANEL);
+    if (ft_st == FT_OUT) {
+        hud_top_put(2, 1, 16, C_CYAN, C_PANEL);
+        hud_top_str(3, 1, " FIGHTER ACTIVE ", C_CYAN);
+        hud_top_str(21, 1, " [X] RECALL ", C_GOLD);
+        hud_top_put(33, 1, 17, C_CYAN, C_PANEL);
+    } else if (ft_st == FT_HOMING) {
+        hud_top_put(7, 1, 16, C_GOLD, C_PANEL);
+        hud_top_str(8, 1, " FIGHTER RETURNING HOME ", C_GOLD);
+        hud_top_put(32, 1, 17, C_GOLD, C_PANEL);
+    } else if (s_pr_window > 0) {
+        uint8_t c = (g_frame & 8u) ? C_RED : C_GOLD;
+        hud_top_put(1, 1, 174, c, C_PANEL);
+        hud_top_str(2, 1, " PIRATES! ", c);
+        hud_top_str(13, 1, " [X] LAUNCH FIGHTER ", C_CYAN);
+        hud_top_put(33, 1, 175, c, C_PANEL);
+    } else {
+        hud_top_put(2, 1, 16, C_TEAL, C_PANEL);
+        hud_top_str(3, 1, " ARK DEFENSE ", C_WHITE);
+        hud_top_str(17, 1, " [X] LAUNCH FIGHTER ", C_GOLD);
+        hud_top_put(37, 1, 17, C_TEAL, C_PANEL);
+    }
 }
 
 /* ------------------------------------------------------------------ */

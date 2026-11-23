@@ -21,7 +21,8 @@
 #define PL_DOCK_Y    76
 #define PL_YMIN      104
 #define PL_YMAX      172
-#define BEAM_HALF    10
+#define BEAM_MIN_Y   116
+#define BEAM_HALF    7
 #define DOCK_ZONE    16
 
 #define MAX_CREATURES 4
@@ -305,87 +306,118 @@ static void deliver_cargo(void)
 
 static void planet_hud_draw(void)
 {
-    hud_top_clear();
-    /* Row 0: $credits  WORLD Ln  creature icons */
-    hud_top_str(0, 0, "$", C_GOLD);
-    hud_top_num(1, 0, g_voy.credits, 5, C_WHITE);
-    hud_top_str(8, 0, WORLD_NAMES[p_world], C_CYAN);
-    hud_top_str(14, 0, "L", C_GREY);
-    hud_top_num(15, 0, p_level, 1, C_WHITE);
+    static const uint8_t world_col[NUM_WORLDS] = {
+        C_GREEN, C_RED, C_CYAN, C_MAGENTA, C_GOLD, C_YELLOW
+    };
 
-    /* Creature status icons */
-    hud_top_str(18, 0, "BIO:", C_GREY);
+    hud_top_clear();
+    /* Row 0: Credits | World badge | Creature gems | Storm status */
+    hud_top_put(0, 0, 4, C_GOLD, C_PANEL);
+    hud_top_put(1, 0, '$', C_GOLD, C_PANEL);
+    hud_top_num(2, 0, g_voy.credits, 5, C_WHITE);
+    hud_top_put(7, 0, 179, C_FRAME, C_PANEL);
+
+    hud_top_str(8, 0, WORLD_NAMES[p_world], world_col[p_world]);
+    hud_top_put(14, 0, 'L', C_GREY, C_FRAME);
+    hud_top_put(15, 0, (uint8_t)('0' + p_level), C_WHITE, C_FRAME);
+    hud_top_put(16, 0, 179, C_FRAME, C_PANEL);
+
+    /* Creature status gems */
+    hud_top_str(17, 0, "BIO", C_TEAL);
     for (uint8_t i = 0; i < p_pop_init; i++) {
         bool caught = (creatures[i].active == 0);
-        hud_top_put((uint8_t)(22 + i * 2), 0, caught ? 254 : 'o', caught ? C_GOLD : C_GREEN, C_PANEL);
+        hud_top_put((uint8_t)(21 + i * 2), 0, caught ? 4 : 9, caught ? C_GOLD : C_GREEN, C_PANEL);
+    }
+    hud_top_put(29, 0, 179, C_FRAME, C_PANEL);
+
+    if (storm_phase == 0) {
+        hud_top_str(30, 0, "ORBIT OK", C_TEAL);
+    } else {
+        hud_top_str(30, 0, "!!STORM!!", (g_frame & 8u) ? C_RED : C_GOLD);
     }
 
-    /* Row 1: 16-cell Scanner [................] centered */
-    uint8_t sc0 = 11;
-    hud_top_str(2, 1, "SCANNER", C_DIM);
-    hud_top_put(sc0 - 1, 1, '[', C_FRAME, C_PANEL);
-    hud_top_put(sc0 + 16, 1, ']', C_FRAME, C_PANEL);
-    for (uint8_t i = 0; i < 16; i++) {
-        bool tow = ((i & 3u) == 2u);
-        hud_top_put((uint8_t)(sc0 + i), 1, tow ? 179 : '.', tow ? C_DIM : C_FRAME, C_PANEL);
+    /* Row 1: Wide 24-cell Planetary Radar in recessed well */
+    for (uint8_t c = 0; c < 40; c++)
+        hud_top_put(c, 1, 196, C_FRAME, C_PANEL);
+    uint8_t sc0 = 8; /* cols 8..31 = 24 cells */
+    hud_top_str(1, 1, "RADAR", C_CYAN);
+    hud_top_put(sc0 - 1, 1, 181, C_CYAN, C_PANEL);
+    hud_top_put(sc0 + 24, 1, 198, C_CYAN, C_PANEL);
+    for (uint8_t i = 0; i < 24; i++)
+        hud_top_put((uint8_t)(sc0 + i), 1, 250, C_DIM, C_FRAME);
+
+    /* 4 Towers on radar */
+    for (uint8_t t = 0; t < NUM_TOWERS; t++) {
+        uint8_t cell = (uint8_t)((uint16_t)(TOWER_OFFSET + t * TOWER_SPACING) * 24u / WORLD_W);
+        hud_top_put((uint8_t)(sc0 + cell), 1, 179, C_GREY, C_FRAME);
     }
+    /* Ark on radar (center = cell 12) */
+    hud_top_put((uint8_t)(sc0 + 12), 1, 'A', C_GOLD, C_FRAME);
 
-    /* Ark on scanner (cell 8) */
-    hud_top_put((uint8_t)(sc0 + 8), 1, 'A', C_GOLD, C_PANEL);
-
-    /* Creatures on scanner */
+    /* Creatures on radar */
     for (uint8_t i = 0; i < MAX_CREATURES; i++) {
         if (creatures[i].active == 1 || creatures[i].active == 2) {
-            uint8_t cell = (uint8_t)((creatures[i].wx & WORLD_MASK) >> 6);
-            hud_top_put((uint8_t)(sc0 + cell), 1, '*', C_GREEN, C_PANEL);
+            uint8_t cell = (uint8_t)((uint16_t)(creatures[i].wx & WORLD_MASK) * 24u / WORLD_W);
+            hud_top_put((uint8_t)(sc0 + cell), 1, '*', C_GREEN, C_FRAME);
         }
     }
-    /* Relic on scanner */
+    /* Relic on radar */
     for (uint8_t i = 0; i < MAX_CRATES; i++) {
         if (crates[i].active && crates[i].is_relic) {
-            uint8_t cell = (uint8_t)((crates[i].wx & WORLD_MASK) >> 6);
-            hud_top_put((uint8_t)(sc0 + cell), 1, 4, C_MAGENTA, C_PANEL);
+            uint8_t cell = (uint8_t)((uint16_t)(crates[i].wx & WORLD_MASK) * 24u / WORLD_W);
+            hud_top_put((uint8_t)(sc0 + cell), 1, 4, C_MAGENTA, C_FRAME);
         }
     }
-    /* Shuttle on scanner */
+    /* Shuttle on radar */
     if (shu_st != SHU_DEAD) {
-        uint8_t cell = (uint8_t)((shu_wx & WORLD_MASK) >> 6);
-        hud_top_put((uint8_t)(sc0 + cell), 1, 30, (g_frame & 8) ? C_WHITE : C_CYAN, C_PANEL);
+        uint8_t cell = (uint8_t)((uint16_t)(shu_wx & WORLD_MASK) * 24u / WORLD_W);
+        hud_top_put((uint8_t)(sc0 + cell), 1, 30, (g_frame & 8u) ? C_WHITE : C_CYAN, C_FRAME);
     }
-    /* Storm warning on scanner */
+    /* Storm rock alert on radar */
     if (storm_phase == 2) {
-        hud_top_put((uint8_t)(sc0 + 8), 1, '!', (g_frame & 4) ? C_RED : C_GOLD, C_PANEL);
+        hud_top_put((uint8_t)(sc0 + 12), 1, '!', (g_frame & 4u) ? C_RED : C_GOLD, C_FRAME);
     }
 
-    /* Bottom HUD */
+    /* Bottom HUD: Row 0 = Energy gauge | Shuttle Bay pill | Cargo Holds */
     hud_bot_clear();
-    hud_bot_str(0, 0, "EN", C_GREEN);
-    hud_bot_bar(3, 0, 10, g_voy.energy, voy_hull_max(), C_GREEN, C_RED);
-    hud_bot_str(15, 0, "BAY:", C_CYAN);
+    hud_bot_put(0, 0, 3, C_GREEN, C_PANEL);
+    hud_bot_put(1, 0, '[', C_CYAN, C_PANEL);
+    hud_bot_bar(2, 0, 10, g_voy.energy, voy_hull_max(), C_GREEN, C_RED);
+    hud_bot_put(12, 0, ']', C_CYAN, C_PANEL);
+    hud_bot_put(13, 0, 179, C_FRAME, C_PANEL);
+
+    hud_bot_str(14, 0, "BAY:", C_CYAN);
     if (shu_st == SHU_DEAD)
-        hud_bot_str(19, 0, "REBUILDING", C_RED);
+        hud_bot_str(18, 0, "REBUILDING", (g_frame & 8u) ? C_RED : C_ORANGE);
     else if (shu_cargo == CARGO_CREATURE)
-        hud_bot_str(19, 0, SPECIES_NAMES[creatures[shu_cargo_idx].species], C_GREEN);
+        hud_bot_str(18, 0, SPECIES_NAMES[creatures[shu_cargo_idx].species], C_GREEN);
     else if (shu_cargo == CARGO_ORE)
-        hud_bot_str(19, 0, "ORE (HEAVY)", C_GOLD);
+        hud_bot_str(18, 0, "ORE CRATE ", C_GOLD);
     else if (shu_cargo == CARGO_RELIC)
-        hud_bot_str(19, 0, "RELIC!!", C_MAGENTA);
+        hud_bot_str(18, 0, "* RELIC! *", (g_frame & 4u) ? C_MAGENTA : C_WHITE);
     else
-        hud_bot_str(19, 0, "EMPTY", C_GREY);
+        hud_bot_str(18, 0, "EMPTY     ", C_DIM);
 
-    hud_bot_str(31, 0, "HLD", C_GOLD);
-    hud_bot_put(35, 0, (uint8_t)('0' + voy_holds_used() / 10), C_WHITE, C_PANEL);
-    hud_bot_put(36, 0, (uint8_t)('0' + voy_holds_used() % 10), C_WHITE, C_PANEL);
-    hud_bot_put(37, 0, '/', C_DIM, C_PANEL);
-    hud_bot_put(38, 0, (uint8_t)('0' + voy_holds_max() / 10), C_WHITE, C_PANEL);
-    hud_bot_put(39, 0, (uint8_t)('0' + voy_holds_max() % 10), C_WHITE, C_PANEL);
+    hud_bot_put(29, 0, 179, C_FRAME, C_PANEL);
+    hud_bot_put(30, 0, 240, C_GOLD, C_PANEL); /* holds icon */
+    hud_bot_str(31, 0, "HLD ", C_GOLD);
+    hud_bot_put(35, 0, (uint8_t)('0' + voy_holds_used() / 10), C_WHITE, C_FRAME);
+    hud_bot_put(36, 0, (uint8_t)('0' + voy_holds_used() % 10), C_WHITE, C_FRAME);
+    hud_bot_put(37, 0, '/', C_DIM, C_FRAME);
+    hud_bot_put(38, 0, (uint8_t)('0' + voy_holds_max() / 10), C_CYAN, C_FRAME);
+    hud_bot_put(39, 0, (uint8_t)('0' + voy_holds_max() % 10), C_CYAN, C_FRAME);
 
-    if (storm_phase == 1 || storm_phase == 2)
-        hud_bot_str(0, 1, "STORM! DOCK & FIRE LASER (UP/LT/RT)", C_RED);
-    else if (shu_st == SHU_DOCKED)
-        hud_bot_str(0, 1, "DOCKED: [DOWN] LAUNCH  [HOLD X] LEAVE", C_CYAN);
-    else
-        hud_bot_str(0, 1, "[Z] TRACTOR BEAM  [X] DROP  [UP] DOCK", C_GREY);
+    /* Row 1: Framed cockpit action rail */
+    for (uint8_t c = 0; c < 40; c++)
+        hud_bot_put(c, 1, 205, C_FRAME, C_PANEL);
+    if (storm_phase == 1 || storm_phase == 2) {
+        uint8_t sc = (g_frame & 8u) ? C_RED : C_GOLD;
+        hud_bot_str(2, 1, " STORM! DOCK & FIRE [UP/LT/RT] ", sc);
+    } else if (shu_st == SHU_DOCKED) {
+        hud_bot_str(3, 1, " [DOWN] LAUNCH   [HOLD X] LEAVE ", C_CYAN);
+    } else {
+        hud_bot_str(2, 1, " [Z] BEAM   [X] DROP   [UP] DOCK ", C_GREY);
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -558,8 +590,8 @@ static void update_shuttle_and_beam(void)
         sfx_player(SFX_BLIP, SFX_PRI_LOW);
     }
 
-    /* Tractor beam with Button 1 (stops shuttle dead!) */
-    if ((in_held & IN_FIRE) && shu_cargo == CARGO_NONE) {
+    /* Tractor beam with Button 1 (only when low enough; stops shuttle dead!) */
+    if ((in_held & IN_FIRE) && shu_cargo == CARGO_NONE && shu_y >= BEAM_MIN_Y) {
         shu_beaming = true;
         shu_vx = 0;
         if ((g_frame & 15u) == 0)
@@ -577,10 +609,12 @@ static void update_shuttle_and_beam(void)
                     c->state = 1;
                     c->vy = 0;
                 } else {
-                    /* Creature rises and struggles slightly */
+                    /* Creature rises and actively struggles in its facing direction */
                     if ((g_frame & 1u) == 0) c->y--;
-                    if ((g_frame & 7u) == 0) {
-                        c->wx = (c->wx + ((rng_u8() & 1u) ? 1 : -1)) & WORLD_MASK;
+                    uint8_t strug_mask = (c->species >= 2) ? 3u : 5u;
+                    if ((g_frame % (strug_mask + 1u)) == 0) {
+                        if ((rng_u8() & 7u) == 0) c->dir = -c->dir;
+                        c->wx = (c->wx + c->dir) & WORLD_MASK;
                     }
                     if (c->y <= shu_y + 10) {
                         c->active = 3;
@@ -710,26 +744,31 @@ static void update_creatures_and_crates(void)
         bool react = false;
         if (shu_st == SHU_FLYING && c->react_cd == 0) {
             int16_t dx = wrap_dx(c->wx, shu_wx);
-            if (dx >= -44 && dx <= 44 && shu_y >= 112) {
-                c->react_cd = 35;
+            if (dx >= -52 && dx <= 52 && shu_y >= 112) {
+                c->react_cd = 26;
                 if (rng_u8() < 192) react = true;
             }
         }
 
         if (c->species == 4) {
-            /* Glider: bobs mid-air */
-            if ((g_frame & 1u) == 0)
-                c->wx = (c->wx + c->dir * (react ? 2 : 1)) & WORLD_MASK;
+            /* Glider: bobs mid-air, accelerates away when shuttle approaches */
+            if (react) {
+                c->dir = (wrap_dx(c->wx, shu_wx) >= 0) ? 1 : -1;
+                c->timer = 30;
+            }
+            int8_t step = (c->timer > 0) ? (int8_t)(c->dir * 2) : c->dir;
+            if (c->timer > 0) c->timer--;
+            c->wx = (c->wx + step) & WORLD_MASK;
             c->y = (int16_t)(146 + ((sin256((uint8_t)(g_frame * 3u + i * 50u)) * 18) >> 8));
-            if (react) c->dir = (wrap_dx(c->wx, shu_wx) >= 0) ? 1 : -1;
             continue;
         }
 
         if (c->state == 1) {
             /* Falling or jumping */
             c->y += c->vy;
-            if ((g_frame & 3u) == 0 && c->vy < 4) c->vy++;
-            c->wx = (c->wx + c->dir) & WORLD_MASK;
+            if ((g_frame & 2u) == 0 && c->vy < 4) c->vy++;
+            int8_t air_step = (c->species == 1) ? (int8_t)(c->dir * 2) : c->dir;
+            c->wx = (c->wx + air_step) & WORLD_MASK;
             if (c->y >= gy) {
                 c->y = gy;
                 c->state = 0;
@@ -739,21 +778,39 @@ static void update_creatures_and_crates(void)
             c->y = gy;
             if (react) {
                 int8_t away = (wrap_dx(c->wx, shu_wx) >= 0) ? 1 : -1;
-                if (c->species == 1) { /* Hopper jumps away */
+                if (c->species == 1) { /* Hopper leaps high away */
                     c->dir = away;
                     c->state = 1;
-                    c->vy = -3;
-                } else {
+                    c->vy = -4;
+                } else if (c->species == 0) { /* Walker reverses randomly & hurries */
+                    c->dir = (rng_u8() & 1u) ? away : -away;
+                    c->timer = 28;
+                } else { /* Runner / Dodger / Skitterer sprint away */
                     c->dir = away;
-                    c->timer = 24;
+                    c->timer = 36;
                 }
             }
-            uint8_t spd_mask = (c->species == 2 || c->species == 5 || c->timer > 0) ? 0u : 1u;
             if (c->timer > 0) c->timer--;
-            if ((g_frame & spd_mask) == 0)
-                c->wx = (c->wx + c->dir) & WORLD_MASK;
-            if ((rng_u8() & 63u) == 0)
+            int8_t step = 0;
+            if (c->species == 5) {
+                /* Skitterer: always fast & twitchy */
+                step = (int8_t)(c->dir * ((g_frame & 1u) ? 2 : 1));
+                if ((rng_u8() & 15u) == 0) c->dir = -c->dir;
+            } else if (c->timer > 0) {
+                /* Fleeing burst */
+                step = (c->species >= 2) ? (int8_t)(c->dir * 2) : c->dir;
+            } else if (c->species == 2 || c->species == 3) {
+                step = c->dir;
+            } else if ((g_frame & 1u) == 0) {
+                step = c->dir;
+            }
+            c->wx = (c->wx + step) & WORLD_MASK;
+            if (c->species == 1 && (rng_u8() & 63u) == 0) {
+                c->state = 1;
+                c->vy = -3;
+            } else if ((rng_u8() & 47u) == 0) {
                 c->dir = -c->dir;
+            }
         }
     }
 

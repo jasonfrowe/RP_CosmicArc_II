@@ -415,7 +415,8 @@ static void draw_bar(mode1_4bpp_data_t *row_ptr, uint8_t col, uint8_t cells,
 {
     if (maxv == 0) maxv = 1;
     uint16_t filled = (uint16_t)val * cells * 2u / maxv;
-    uint8_t fg = ((uint16_t)val * 4u <= maxv) ? fg_lo : fg_hi;
+    uint8_t fg = ((uint16_t)val * 4u <= maxv) ? fg_lo :
+                 (((uint16_t)val * 2u <= maxv) ? C_GOLD : fg_hi);
     for (uint8_t i = 0; i < cells && (col + i) < TXT_COLS; i++) {
         uint8_t ch;
         uint8_t c = fg;
@@ -426,10 +427,10 @@ static void draw_bar(mode1_4bpp_data_t *row_ptr, uint8_t col, uint8_t cells,
             ch = 221; /* half block */
             filled = 0;
         } else {
-            ch = 176; /* light shade empty */
+            ch = 176; /* subtle recessed grid */
             c = C_DIM;
         }
-        put_cell(&row_ptr[col + i], ch, c, C_PANEL);
+        put_cell(&row_ptr[col + i], ch, c, C_FRAME);
     }
 }
 
@@ -491,9 +492,19 @@ void msg_center(uint8_t row, const char *s, uint8_t fg)
         put_cell(&msg_buf[row][c], ' ', C_WHITE, C_TRANS);
     uint8_t len = (uint8_t)strlen(s);
     if (len > 0) {
-        uint8_t col = (len < TXT_COLS) ? (uint8_t)((TXT_COLS - len) / 2u) : 0;
-        for (uint8_t i = 0; i < len && (col + i) < TXT_COLS; i++)
-            put_cell(&msg_buf[row][col + i], (uint8_t)s[i], fg, C_PANEL);
+        uint8_t pad_len = (uint8_t)(len + 4u);
+        uint8_t col = (pad_len < TXT_COLS) ? (uint8_t)((TXT_COLS - pad_len) / 2u) : 0;
+        if (pad_len < TXT_COLS) {
+            put_cell(&msg_buf[row][col], 17, C_CYAN, C_FRAME);
+            put_cell(&msg_buf[row][col + 1], ' ', fg, C_PANEL);
+            for (uint8_t i = 0; i < len; i++)
+                put_cell(&msg_buf[row][col + 2 + i], (uint8_t)s[i], fg, C_PANEL);
+            put_cell(&msg_buf[row][col + 2 + len], ' ', fg, C_PANEL);
+            put_cell(&msg_buf[row][col + 3 + len], 16, C_CYAN, C_FRAME);
+        } else {
+            for (uint8_t i = 0; i < len && i < TXT_COLS; i++)
+                put_cell(&msg_buf[row][i], (uint8_t)s[i], fg, C_PANEL);
+        }
     }
     msg_dirty = true;
 }
