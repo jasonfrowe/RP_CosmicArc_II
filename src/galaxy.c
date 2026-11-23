@@ -384,6 +384,51 @@ static void fmt_port_class(char *out, uint8_t cls)
     out[3] = '\0';
 }
 
+static void draw_sector_item(uint8_t i)
+{
+    uint8_t s = g_voy.sector;
+    uint8_t row = (uint8_t)(10 + i);
+    bool sel = (i == mv_sel);
+    uint8_t bg = sel ? C_FRAME : C_PANEL;
+    txt_str(1, row, "                                      ", C_WHITE, bg);
+    if (sel) txt_str(2, row, ">", C_GOLD, bg);
+
+    uint8_t it = mv_items[i];
+    if (it == 0x81) {
+        txt_str(4, row, "DOCK AT STARPORT", C_CYAN, bg);
+    } else if (it == 0x80) {
+        bool can = (galaxy_planet_pop(s) > 0) || (s == g_voy.relic_sec && g_voy.relic_state == 0);
+        txt_str(4, row, can ? "LAND ON PLANET" : "PLANET BARREN (WAIT TO REPOP)",
+                can ? C_GREEN : C_DIM, bg);
+    } else {
+        uint8_t d = mv_item_dir[i];
+        bool oneway = !(g_gx.warp[it] & (uint8_t)(1u << ((d + 4u) & 7u)));
+        txt_str(4, row, "WARP ", C_GREY, bg);
+        txt_str(9, row, dir_lbl[d], C_GOLD, bg);
+        txt_str(12, row, oneway ? "-> SEC " : "-- SEC ", oneway ? C_RED : C_DIM, bg);
+        txt_num(19, row, (uint32_t)(it + 1), 2, C_WHITE, bg);
+        if (g_voy.visited[it] & 1u) {
+            uint8_t nt = sec_type(it);
+            if (nt == GT_PORT) {
+                char cls[4];
+                fmt_port_class(cls, sec_sub(it));
+                txt_str(23, row, "PORT ", C_CYAN, bg);
+                txt_str(28, row, cls, C_GOLD, bg);
+            } else if (nt == GT_PLANET) {
+                txt_str(23, row, WORLD_NAMES[sec_sub(it)], C_GREEN, bg);
+                txt_str(29, row, "L", C_GREY, bg);
+                txt_num(30, row, galaxy_planet_level(it), 1, C_CYAN, bg);
+            } else if (nt == GT_NEBULA) {
+                txt_str(23, row, "NEBULA", C_MAGENTA, bg);
+            } else {
+                txt_str(23, row, "EMPTY", C_DIM, bg);
+            }
+        } else {
+            txt_str(23, row, "???", C_DIM, bg);
+        }
+    }
+}
+
 static void draw_sector_view(void)
 {
     uint8_t s = g_voy.sector;
@@ -432,49 +477,8 @@ static void draw_sector_view(void)
     txt_box(0, 8, 40, 14, C_FRAME, C_PANEL);
     txt_str(2, 8, " NAVIGATION & ACTIONS ", C_CYAN, C_PANEL);
 
-    for (uint8_t i = 0; i < mv_nitems; i++) {
-        uint8_t row = (uint8_t)(10 + i);
-        bool sel = (i == mv_sel);
-        uint8_t bg = sel ? C_FRAME : C_PANEL;
-        if (sel) {
-            for (uint8_t c = 1; c < 39; c++) txt_put(c, row, ' ', C_WHITE, bg);
-            txt_str(2, row, ">", C_GOLD, bg);
-        }
-        uint8_t it = mv_items[i];
-        if (it == 0x81) {
-            txt_str(4, row, "DOCK AT STARPORT", C_CYAN, bg);
-        } else if (it == 0x80) {
-            bool can = (galaxy_planet_pop(s) > 0) || (s == g_voy.relic_sec && g_voy.relic_state == 0);
-            txt_str(4, row, can ? "LAND ON PLANET" : "PLANET BARREN (WAIT TO REPOP)",
-                    can ? C_GREEN : C_DIM, bg);
-        } else {
-            uint8_t d = mv_item_dir[i];
-            bool oneway = !(g_gx.warp[it] & (uint8_t)(1u << ((d + 4u) & 7u)));
-            txt_str(4, row, "WARP ", C_GREY, bg);
-            txt_str(9, row, dir_lbl[d], C_GOLD, bg);
-            txt_str(12, row, oneway ? "-> SEC " : "-- SEC ", oneway ? C_RED : C_DIM, bg);
-            txt_num(19, row, (uint32_t)(it + 1), 2, C_WHITE, bg);
-            if (g_voy.visited[it] & 1u) {
-                uint8_t nt = sec_type(it);
-                if (nt == GT_PORT) {
-                    char cls[4];
-                    fmt_port_class(cls, sec_sub(it));
-                    txt_str(23, row, "PORT ", C_CYAN, bg);
-                    txt_str(28, row, cls, C_GOLD, bg);
-                } else if (nt == GT_PLANET) {
-                    txt_str(23, row, WORLD_NAMES[sec_sub(it)], C_GREEN, bg);
-                    txt_str(29, row, "L", C_GREY, bg);
-                    txt_num(30, row, galaxy_planet_level(it), 1, C_CYAN, bg);
-                } else if (nt == GT_NEBULA) {
-                    txt_str(23, row, "NEBULA", C_MAGENTA, bg);
-                } else {
-                    txt_str(23, row, "EMPTY", C_DIM, bg);
-                }
-            } else {
-                txt_str(23, row, "???", C_DIM, bg);
-            }
-        }
-    }
+    for (uint8_t i = 0; i < mv_nitems; i++)
+        draw_sector_item(i);
 
     /* Status Footer */
     txt_box(0, 23, 40, 5, C_CYAN, C_PANEL);
@@ -500,59 +504,28 @@ static void draw_sector_view(void)
     txt_center(29, "[Z] SELECT   [X] STAR CHART   [ESC] MENU", C_DIM, C_TRANS);
 }
 
-static void draw_star_chart(void)
+static void draw_chart_cursor(uint8_t cx, uint8_t cy, bool show)
 {
-    txt_clear(C_TRANS);
-    txt_box(0, 0, 40, 3, C_CYAN, C_PANEL);
-    txt_center(1, "GALACTIC STAR CHART (12x8)", C_GOLD, C_PANEL);
-
-    /* Draw 12x8 grid: each cell is 3 cols x 2 rows starting at (2, 4) */
-    for (uint8_t s = 0; s < GX_SECTORS; s++) {
-        if (!(g_voy.visited[s] & 3u)) continue;
-        uint8_t cx = g_gx.cell[s] & 0x0Fu;
-        uint8_t cy = g_gx.cell[s] >> 4;
-        uint8_t sx = (uint8_t)(2 + cx * 3);
-        uint8_t sy = (uint8_t)(4 + cy * 2);
-
-        /* Draw warp connectors for visited sectors */
-        if (g_voy.visited[s] & 1u) {
-            if (g_gx.warp[s] & (1u << 2)) txt_put(sx + 1, sy, '-', C_DIM, C_TRANS);
-            if (g_gx.warp[s] & (1u << 2)) txt_put(sx + 2, sy, '-', C_DIM, C_TRANS);
-            if (g_gx.warp[s] & (1u << 4)) txt_put(sx, sy + 1, '|', C_DIM, C_TRANS);
-            if (g_gx.warp[s] & (1u << 3)) txt_put(sx + 1, sy + 1, '\\', C_DIM, C_TRANS);
-            if (g_gx.warp[s] & (1u << 5)) txt_put(sx - 1, sy + 1, '/', C_DIM, C_TRANS);
-        }
+    uint8_t kx = (uint8_t)(2 + cx * 3);
+    uint8_t ky = (uint8_t)(4 + cy * 2);
+    if (show) {
+        if (kx > 0) txt_put(kx - 1, ky, '[', C_WHITE, C_TRANS);
+        if (kx + 1 < TXT_COLS) txt_put(kx + 1, ky, ']', C_WHITE, C_TRANS);
+    } else {
+        /* Restore horizontal warp connectors if a visited sector connects across */
+        int8_t s = sector_at_cell(cx, cy);
+        int8_t sl = (cx > 0) ? sector_at_cell((uint8_t)(cx - 1), cy) : -1;
+        bool has_l = (sl >= 0 && (g_voy.visited[sl] & 1u) && (g_gx.warp[sl] & (1u << 2)));
+        bool has_r = (s >= 0 && (g_voy.visited[s] & 1u) && (g_gx.warp[s] & (1u << 2)));
+        if (kx > 0) txt_put(kx - 1, ky, has_l ? '-' : ' ', C_DIM, C_TRANS);
+        if (kx + 1 < TXT_COLS) txt_put(kx + 1, ky, has_r ? '-' : ' ', C_DIM, C_TRANS);
     }
+}
 
-    for (uint8_t s = 0; s < GX_SECTORS; s++) {
-        if (!(g_voy.visited[s] & 3u)) continue;
-        uint8_t cx = g_gx.cell[s] & 0x0Fu;
-        uint8_t cy = g_gx.cell[s] >> 4;
-        uint8_t sx = (uint8_t)(2 + cx * 3);
-        uint8_t sy = (uint8_t)(4 + cy * 2);
-        bool is_cur = (cx == chart_cx && cy == chart_cy);
-        uint8_t bg = is_cur ? C_FRAME : C_TRANS;
-
-        if (s == g_voy.sector) {
-            txt_put(sx, sy, '@', C_GOLD, C_PANEL);
-        } else if (g_voy.visited[s] & 1u) {
-            uint8_t t = sec_type(s);
-            uint8_t ch = (t == GT_PORT) ? 'P' : (t == GT_PLANET ? 'O' : (t == GT_NEBULA ? '#' : '+'));
-            uint8_t fg = (t == GT_PORT) ? C_CYAN : (t == GT_PLANET ? C_GREEN : (t == GT_NEBULA ? C_MAGENTA : C_GREY));
-            txt_put(sx, sy, ch, fg, bg);
-        } else {
-            txt_put(sx, sy, '?', C_DIM, bg);
-        }
-    }
-
-    /* Highlight cursor brackets */
-    uint8_t kx = (uint8_t)(2 + chart_cx * 3);
-    uint8_t ky = (uint8_t)(4 + chart_cy * 2);
-    if (kx > 0) txt_put(kx - 1, ky, '[', C_WHITE, C_TRANS);
-    if (kx + 1 < TXT_COLS) txt_put(kx + 1, ky, ']', C_WHITE, C_TRANS);
-
-    /* Inspect sector under cursor */
-    txt_box(0, 21, 40, 6, C_CYAN, C_PANEL);
+static void draw_chart_inspect(void)
+{
+    for (uint8_t r = 22; r <= 25; r++)
+        txt_str(1, r, "                                      ", C_WHITE, C_PANEL);
     int8_t hs = sector_at_cell(chart_cx, chart_cy);
     if (hs >= 0 && (g_voy.visited[hs] & 3u)) {
         txt_str(2, 22, "SECTOR ", C_GREY, C_PANEL);
@@ -581,6 +554,52 @@ static void draw_star_chart(void)
     } else {
         txt_str(2, 23, "UNCHARTED VOID", C_DIM, C_PANEL);
     }
+}
+
+static void draw_star_chart(void)
+{
+    txt_clear(C_TRANS);
+    txt_box(0, 0, 40, 3, C_CYAN, C_PANEL);
+    txt_center(1, "GALACTIC STAR CHART (12x8)", C_GOLD, C_PANEL);
+
+    for (uint8_t s = 0; s < GX_SECTORS; s++) {
+        if (!(g_voy.visited[s] & 3u)) continue;
+        uint8_t cx = g_gx.cell[s] & 0x0Fu;
+        uint8_t cy = g_gx.cell[s] >> 4;
+        uint8_t sx = (uint8_t)(2 + cx * 3);
+        uint8_t sy = (uint8_t)(4 + cy * 2);
+
+        if (g_voy.visited[s] & 1u) {
+            if (g_gx.warp[s] & (1u << 2)) txt_put(sx + 1, sy, '-', C_DIM, C_TRANS);
+            if (g_gx.warp[s] & (1u << 2)) txt_put(sx + 2, sy, '-', C_DIM, C_TRANS);
+            if (g_gx.warp[s] & (1u << 4)) txt_put(sx, sy + 1, '|', C_DIM, C_TRANS);
+            if (g_gx.warp[s] & (1u << 3)) txt_put(sx + 1, sy + 1, '\\', C_DIM, C_TRANS);
+            if (g_gx.warp[s] & (1u << 5)) txt_put(sx - 1, sy + 1, '/', C_DIM, C_TRANS);
+        }
+    }
+
+    for (uint8_t s = 0; s < GX_SECTORS; s++) {
+        if (!(g_voy.visited[s] & 3u)) continue;
+        uint8_t cx = g_gx.cell[s] & 0x0Fu;
+        uint8_t cy = g_gx.cell[s] >> 4;
+        uint8_t sx = (uint8_t)(2 + cx * 3);
+        uint8_t sy = (uint8_t)(4 + cy * 2);
+
+        if (s == g_voy.sector) {
+            txt_put(sx, sy, '@', C_GOLD, C_PANEL);
+        } else if (g_voy.visited[s] & 1u) {
+            uint8_t t = sec_type(s);
+            uint8_t ch = (t == GT_PORT) ? 'P' : (t == GT_PLANET ? 'O' : (t == GT_NEBULA ? '#' : '+'));
+            uint8_t fg = (t == GT_PORT) ? C_CYAN : (t == GT_PLANET ? C_GREEN : (t == GT_NEBULA ? C_MAGENTA : C_GREY));
+            txt_put(sx, sy, ch, fg, C_TRANS);
+        } else {
+            txt_put(sx, sy, '?', C_DIM, C_TRANS);
+        }
+    }
+
+    draw_chart_cursor(chart_cx, chart_cy, true);
+    txt_box(0, 21, 40, 6, C_CYAN, C_PANEL);
+    draw_chart_inspect();
 
     txt_str(2, 28, "@:ARK P:PORT O:PLANET #:NEBULA ?:SEEN", C_GREY, C_TRANS);
     txt_center(29, "ARROWS: INSPECT  [X] CLOSE-UP  [Z] BACK", C_DIM, C_TRANS);
@@ -674,13 +693,17 @@ map_action_t map_update(void)
 
     if (mv_mode == MV_SECTOR) {
         if (in_pressed & IN_UP) {
+            uint8_t old = mv_sel;
             mv_sel = (mv_sel == 0) ? (uint8_t)(mv_nitems - 1) : (uint8_t)(mv_sel - 1);
             sfx_player(SFX_BLIP, SFX_PRI_LOW);
-            draw_sector_view();
+            draw_sector_item(old);
+            draw_sector_item(mv_sel);
         } else if (in_pressed & IN_DOWN) {
+            uint8_t old = mv_sel;
             mv_sel = (uint8_t)((mv_sel + 1) % mv_nitems);
             sfx_player(SFX_BLIP, SFX_PRI_LOW);
-            draw_sector_view();
+            draw_sector_item(old);
+            draw_sector_item(mv_sel);
         } else if (in_pressed & IN_BTN2) {
             mv_mode = MV_CHART;
             g_pending_ach = 0xFFu;
@@ -722,14 +745,16 @@ map_action_t map_update(void)
             }
         }
     } else if (mv_mode == MV_CHART) {
-        bool moved = false;
-        if ((in_pressed & IN_LEFT) && chart_cx > 0) { chart_cx--; moved = true; }
-        if ((in_pressed & IN_RIGHT) && chart_cx < GX_GRID_W - 1) { chart_cx++; moved = true; }
-        if ((in_pressed & IN_UP) && chart_cy > 0) { chart_cy--; moved = true; }
-        if ((in_pressed & IN_DOWN) && chart_cy < GX_GRID_H - 1) { chart_cy++; moved = true; }
-        if (moved) {
+        uint8_t ox = chart_cx, oy = chart_cy;
+        if ((in_pressed & IN_LEFT) && chart_cx > 0) chart_cx--;
+        if ((in_pressed & IN_RIGHT) && chart_cx < GX_GRID_W - 1) chart_cx++;
+        if ((in_pressed & IN_UP) && chart_cy > 0) chart_cy--;
+        if ((in_pressed & IN_DOWN) && chart_cy < GX_GRID_H - 1) chart_cy++;
+        if (chart_cx != ox || chart_cy != oy) {
             sfx_player(SFX_BLIP, SFX_PRI_LOW);
-            draw_star_chart();
+            draw_chart_cursor(ox, oy, false);
+            draw_chart_cursor(chart_cx, chart_cy, true);
+            draw_chart_inspect();
         } else if (in_pressed & IN_BTN2) {
             mv_mode = MV_CLOSEUP;
             sfx_player(SFX_BLIP, SFX_PRI_LOW);

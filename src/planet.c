@@ -21,8 +21,7 @@
 #define PL_DOCK_Y    76
 #define PL_YMIN      104
 #define PL_YMAX      172
-#define BEAM_MIN_Y   116
-#define BEAM_HALF    7
+#define BEAM_HALF    10
 #define DOCK_ZONE    16
 
 #define MAX_CREATURES 4
@@ -590,8 +589,8 @@ static void update_shuttle_and_beam(void)
         sfx_player(SFX_BLIP, SFX_PRI_LOW);
     }
 
-    /* Tractor beam with Button 1 (only when low enough; stops shuttle dead!) */
-    if ((in_held & IN_FIRE) && shu_cargo == CARGO_NONE && shu_y >= BEAM_MIN_Y) {
+    /* Tractor beam with Button 1 (stops shuttle dead!) */
+    if ((in_held & IN_FIRE) && shu_cargo == CARGO_NONE) {
         shu_beaming = true;
         shu_vx = 0;
         if ((g_frame & 15u) == 0)

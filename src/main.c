@@ -135,6 +135,44 @@ static void probe_all_slots(void)
         save_probe(i, &slot_info[i]);
 }
 
+static void title_draw_item(uint8_t i)
+{
+    uint8_t row = (uint8_t)(16 + i * 2);
+    bool sel = (i == title_sel);
+    if (sel) {
+        txt_str(10, row, "> ", C_GOLD, C_PANEL);
+        txt_str(12, row, title_items[i], C_WHITE, C_PANEL);
+        txt_str(28, row, " <", C_GOLD, C_PANEL);
+    } else {
+        txt_str(10, row, "  ", C_GREY, C_TRANS);
+        txt_str(12, row, title_items[i], C_GREY, C_TRANS);
+        txt_str(28, row, "  ", C_GREY, C_TRANS);
+    }
+}
+
+static void slot_draw_item(uint8_t i)
+{
+    uint8_t row = (uint8_t)(18 + i * 2);
+    bool sel = (i == slot_sel);
+    uint8_t bg = sel ? C_FRAME : C_PANEL;
+    txt_str(2, row, "                                    ", C_WHITE, bg);
+    txt_str(3, row, sel ? ">" : " ", C_GOLD, bg);
+    txt_str(4, row, "SLOT ", C_CYAN, bg);
+    txt_num(9, row, (uint32_t)(i + 1), 1, C_WHITE, bg);
+    if (slot_info[i].valid) {
+        txt_str(12, row, "S", C_GREY, bg);
+        txt_num(13, row, (uint32_t)(slot_info[i].sector + 1), 2, C_WHITE, bg);
+        txt_str(16, row, "D", C_GREY, bg);
+        txt_num(17, row, slot_info[i].stardate, 3, C_CYAN, bg);
+        txt_str(21, row, "$", C_GOLD, bg);
+        txt_num(22, row, slot_info[i].credits, 5, C_WHITE, bg);
+        txt_str(29, row, "ACH", C_GREEN, bg);
+        txt_num(33, row, slot_info[i].ach_count, 2, C_GOLD, bg);
+    } else {
+        txt_str(14, row, "--- EMPTY SLOT ---", C_DIM, bg);
+    }
+}
+
 static void title_draw_menu(void)
 {
     txt_clear(C_TRANS);
@@ -144,44 +182,16 @@ static void title_draw_menu(void)
     txt_center(6,  "==================================", C_CYAN, C_TRANS);
 
     if (slot_mode == 0) {
-        for (uint8_t i = 0; i < TITLE_NITEMS; i++) {
-            uint8_t row = (uint8_t)(16 + i * 2);
-            bool sel = (i == title_sel);
-            if (sel) {
-                txt_str(10, row, "> ", C_GOLD, C_PANEL);
-                txt_str(12, row, title_items[i], C_WHITE, C_PANEL);
-                txt_str(28, row, " <", C_GOLD, C_PANEL);
-            } else {
-                txt_str(12, row, title_items[i], C_GREY, C_TRANS);
-            }
-        }
+        for (uint8_t i = 0; i < TITLE_NITEMS; i++)
+            title_draw_item(i);
         txt_center(25, "ARROWS/WASD: MOVE   Z/SPACE: FIRE/BEAM", C_DIM, C_TRANS);
         txt_center(26, "X/K: FIGHTER/DROP/CHART   ENTER: START", C_DIM, C_TRANS);
         txt_center(28, "PICOCOMPUTER 6502  -  OPL2 FM AUDIO", C_TEAL, C_TRANS);
     } else {
         txt_center(15, slot_mode == 1 ? "SELECT SLOT FOR NEW VOYAGE" : "SELECT VOYAGE TO CONTINUE",
                    C_GOLD, C_PANEL);
-        for (uint8_t i = 0; i < SAVE_SLOTS; i++) {
-            uint8_t row = (uint8_t)(18 + i * 2);
-            bool sel = (i == slot_sel);
-            uint8_t bg = sel ? C_FRAME : C_PANEL;
-            for (uint8_t c = 2; c < 38; c++) txt_put(c, row, ' ', C_WHITE, bg);
-            txt_str(3, row, sel ? ">" : " ", C_GOLD, bg);
-            txt_str(4, row, "SLOT ", C_CYAN, bg);
-            txt_num(9, row, (uint32_t)(i + 1), 1, C_WHITE, bg);
-            if (slot_info[i].valid) {
-                txt_str(12, row, "S", C_GREY, bg);
-                txt_num(13, row, (uint32_t)(slot_info[i].sector + 1), 2, C_WHITE, bg);
-                txt_str(16, row, "D", C_GREY, bg);
-                txt_num(17, row, slot_info[i].stardate, 3, C_CYAN, bg);
-                txt_str(21, row, "$", C_GOLD, bg);
-                txt_num(22, row, slot_info[i].credits, 5, C_WHITE, bg);
-                txt_str(29, row, "ACH", C_GREEN, bg);
-                txt_num(33, row, slot_info[i].ach_count, 2, C_GOLD, bg);
-            } else {
-                txt_str(14, row, "--- EMPTY SLOT ---", C_DIM, bg);
-            }
-        }
+        for (uint8_t i = 0; i < SAVE_SLOTS; i++)
+            slot_draw_item(i);
         txt_center(26, "[Z] SELECT    [X] BACK    [ESC] ERASE", C_DIM, C_TRANS);
     }
 }
@@ -213,13 +223,17 @@ static void title_update(void)
 
     if (slot_mode == 0) {
         if (in_pressed & IN_UP) {
+            uint8_t old = title_sel;
             title_sel = (title_sel == 0) ? (TITLE_NITEMS - 1) : (uint8_t)(title_sel - 1);
             sfx_player(SFX_BLIP, SFX_PRI_LOW);
-            title_draw_menu();
+            title_draw_item(old);
+            title_draw_item(title_sel);
         } else if (in_pressed & IN_DOWN) {
+            uint8_t old = title_sel;
             title_sel = (uint8_t)((title_sel + 1) % TITLE_NITEMS);
             sfx_player(SFX_BLIP, SFX_PRI_LOW);
-            title_draw_menu();
+            title_draw_item(old);
+            title_draw_item(title_sel);
         } else if (in_pressed & (IN_FIRE | IN_START)) {
             sfx_player(SFX_DOCK, SFX_PRI_EVENT);
             if (title_sel == 0) {
@@ -246,13 +260,17 @@ static void title_update(void)
         }
     } else {
         if (in_pressed & IN_UP) {
+            uint8_t old = slot_sel;
             slot_sel = (slot_sel == 0) ? (SAVE_SLOTS - 1) : (uint8_t)(slot_sel - 1);
             sfx_player(SFX_BLIP, SFX_PRI_LOW);
-            title_draw_menu();
+            slot_draw_item(old);
+            slot_draw_item(slot_sel);
         } else if (in_pressed & IN_DOWN) {
+            uint8_t old = slot_sel;
             slot_sel = (uint8_t)((slot_sel + 1) % SAVE_SLOTS);
             sfx_player(SFX_BLIP, SFX_PRI_LOW);
-            title_draw_menu();
+            slot_draw_item(old);
+            slot_draw_item(slot_sel);
         } else if (in_pressed & IN_BTN2) {
             slot_mode = 0;
             sfx_player(SFX_BLIP, SFX_PRI_LOW);
@@ -261,7 +279,7 @@ static void title_update(void)
             save_erase(slot_sel);
             probe_all_slots();
             sfx_player(SFX_DENY, SFX_PRI_LOW);
-            title_draw_menu();
+            slot_draw_item(slot_sel);
         } else if (in_pressed & IN_FIRE) {
             g_save_slot = slot_sel;
             if (slot_mode == 1) {

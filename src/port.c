@@ -65,6 +65,78 @@ static void set_msg(const char *m)
     pt_msg[sizeof(pt_msg) - 1] = '\0';
 }
 
+static void port_draw_row(uint8_t idx)
+{
+    uint8_t lidx = (uint8_t)(tab_lines() - 1);
+    bool sel = (idx == pt_sel);
+    uint8_t bg = sel ? C_FRAME : C_PANEL;
+
+    if (idx == lidx) {
+        txt_str(1, 19, "                                      ", C_WHITE, bg);
+        txt_str(1, 19, sel ? ">" : " ", C_GOLD, bg);
+        txt_str(2, 19, "LEAVE STARPORT", C_ORANGE, bg);
+        return;
+    }
+
+    if (pt_tab == 0) {
+        uint8_t c = idx;
+        uint8_t r = (uint8_t)(8 + c * 2);
+        bool sells = (pt_cls & (1u << c)) != 0;
+        uint8_t st = g_voy.port_stock[pt_pidx][c];
+        uint8_t avail = sells ? st : (uint8_t)(PT_FULL - st);
+        uint16_t pr = comm_price(c);
+        txt_str(1, r, "                                      ", C_WHITE, bg);
+        txt_str(1, r, sel ? ">" : " ", C_GOLD, bg);
+        txt_str(2, r, COMM_NAMES[c], C_WHITE, bg);
+        txt_str(13, r, sells ? "BUY " : "SELL", sells ? C_GREEN : C_GOLD, bg);
+        txt_str(18, r, "$", C_GOLD, bg);
+        txt_num(19, r, pr, 3, C_WHITE, bg);
+        txt_num(25, r, avail, 2, avail ? C_CYAN : C_RED, bg);
+        txt_num(31, r, *comm_qty_ptr(c), 2, C_WHITE, bg);
+    } else if (pt_tab == 1) {
+        uint8_t i = idx;
+        uint8_t r = (uint8_t)(8 + i);
+        txt_str(1, r, "                                      ", C_WHITE, bg);
+        txt_str(1, r, sel ? ">" : " ", C_GOLD, bg);
+        txt_str(2, r, SPECIES_NAMES[i], C_WHITE, bg);
+        txt_num(13, r, g_voy.stasis[i], 2, g_voy.stasis[i] ? C_GREEN : C_DIM, bg);
+        txt_num(20, r, g_voy.keep[i], 1, g_voy.keep[i] >= 2 ? C_GOLD : C_CYAN, bg);
+        txt_str(21, r, "/2", C_DIM, bg);
+        txt_str(26, r, "$", C_GOLD, bg);
+        txt_num(27, r, bio_bounty(i), 3, C_WHITE, bg);
+    } else if (pt_tab == 2) {
+        uint8_t i = idx;
+        uint8_t r = (uint8_t)(8 + i * 2);
+        uint8_t need = (uint8_t)(voy_hull_max() - g_voy.energy);
+        uint16_t ecost = (uint16_t)need * EN_PRICE[pt_tier];
+        uint16_t hcost = (uint16_t)(1000u + (uint16_t)g_voy.u_hull * 200u);
+        uint16_t ccost = (g_voy.u_holds == 0) ? 3000u : 6000u;
+        txt_str(1, r, "                                      ", C_WHITE, bg);
+        txt_str(1, r, sel ? ">" : " ", C_GOLD, bg);
+        if (i == 0) {
+            txt_str(2, r, "RECHARGE ENERGY", C_GREEN, bg);
+            if (need == 0) txt_str(24, r, "FULL", C_DIM, bg);
+            else { txt_str(23, r, "$", C_GOLD, bg); txt_num(24, r, ecost, 4, C_WHITE, bg); }
+        } else if (i == 1) {
+            txt_str(2, r, "HULL +5 MAX EN", C_CYAN, bg);
+            if (g_voy.u_hull >= EN_UPS_MAX) txt_str(24, r, "MAXED", C_GOLD, bg);
+            else { txt_str(23, r, "$", C_GOLD, bg); txt_num(24, r, hcost, 4, C_WHITE, bg); }
+        } else {
+            txt_str(2, r, "CARGO HOLDS +5", C_CYAN, bg);
+            if (g_voy.u_holds >= 2) txt_str(24, r, "MAXED", C_GOLD, bg);
+            else { txt_str(23, r, "$", C_GOLD, bg); txt_num(24, r, ccost, 4, C_WHITE, bg); }
+        }
+    } else {
+        static const char *const blbl[4] = {
+            "DEPOSIT $100", "DEPOSIT ALL", "WITHDRAW $100", "WITHDRAW ALL"
+        };
+        uint8_t r = (uint8_t)(10 + idx);
+        txt_str(1, r, "                                      ", C_WHITE, bg);
+        txt_str(1, r, sel ? ">" : " ", C_GOLD, bg);
+        txt_str(2, r, blbl[idx], C_WHITE, bg);
+    }
+}
+
 static void port_draw(void)
 {
     txt_clear(C_TRANS);
@@ -88,25 +160,6 @@ static void port_draw(void)
 
     if (pt_tab == 0) {
         txt_str(2, 6, "GOOD       ACT  PRICE  STK  YOURS", C_CYAN, C_PANEL);
-        for (uint8_t c = 0; c < 3; c++) {
-            uint8_t r = (uint8_t)(8 + c * 2);
-            bool sel = (pt_sel == c);
-            uint8_t bg = sel ? C_FRAME : C_PANEL;
-            bool sells = (pt_cls & (1u << c)) != 0;
-            uint8_t st = g_voy.port_stock[pt_pidx][c];
-            uint8_t avail = sells ? st : (uint8_t)(PT_FULL - st);
-            uint16_t pr = comm_price(c);
-
-            if (sel) for (uint8_t x = 1; x < 39; x++) txt_put(x, r, ' ', C_WHITE, bg);
-            txt_str(1, r, sel ? ">" : " ", C_GOLD, bg);
-            txt_str(2, r, COMM_NAMES[c], C_WHITE, bg);
-            txt_str(13, r, sells ? "BUY " : "SELL", sells ? C_GREEN : C_GOLD, bg);
-            txt_str(18, r, "$", C_GOLD, bg);
-            txt_num(19, r, pr, 3, C_WHITE, bg);
-            txt_num(25, r, avail, 2, avail ? C_CYAN : C_RED, bg);
-            txt_num(31, r, *comm_qty_ptr(c), 2, C_WHITE, bg);
-        }
-        /* Relic rumour */
         if (g_voy.relic_state == 0) {
             uint8_t hint = (g_voy.relic_sec > 0) ? g_voy.relic_sec : 60;
             txt_str(2, 16, "RUMOUR: RELIC NEAR SECTOR ", C_MAGENTA, C_PANEL);
@@ -116,46 +169,8 @@ static void port_draw(void)
         }
     } else if (pt_tab == 1) {
         txt_str(2, 6, "SPECIES   STASIS  KEPT  BOUNTY", C_CYAN, C_PANEL);
-        for (uint8_t i = 0; i < NUM_SPECIES; i++) {
-            uint8_t r = (uint8_t)(8 + i);
-            bool sel = (pt_sel == i);
-            uint8_t bg = sel ? C_FRAME : C_PANEL;
-            if (sel) for (uint8_t x = 1; x < 39; x++) txt_put(x, r, ' ', C_WHITE, bg);
-            txt_str(1, r, sel ? ">" : " ", C_GOLD, bg);
-            txt_str(2, r, SPECIES_NAMES[i], C_WHITE, bg);
-            txt_num(13, r, g_voy.stasis[i], 2, g_voy.stasis[i] ? C_GREEN : C_DIM, bg);
-            txt_num(20, r, g_voy.keep[i], 1, g_voy.keep[i] >= 2 ? C_GOLD : C_CYAN, bg);
-            txt_str(21, r, "/2", C_DIM, bg);
-            txt_str(26, r, "$", C_GOLD, bg);
-            txt_num(27, r, bio_bounty(i), 3, C_WHITE, bg);
-        }
         txt_str(2, 16, "[Z] SELL 1   [LEFT] KEEP FOR MANIFEST", C_GREY, C_PANEL);
     } else if (pt_tab == 2) {
-        uint8_t need = (uint8_t)(voy_hull_max() - g_voy.energy);
-        uint16_t ecost = (uint16_t)need * EN_PRICE[pt_tier];
-        uint16_t hcost = (uint16_t)(1000u + (uint16_t)g_voy.u_hull * 200u);
-        uint16_t ccost = (g_voy.u_holds == 0) ? 3000u : 6000u;
-
-        for (uint8_t i = 0; i < 3; i++) {
-            uint8_t r = (uint8_t)(8 + i * 2);
-            bool sel = (pt_sel == i);
-            uint8_t bg = sel ? C_FRAME : C_PANEL;
-            if (sel) for (uint8_t x = 1; x < 39; x++) txt_put(x, r, ' ', C_WHITE, bg);
-            txt_str(1, r, sel ? ">" : " ", C_GOLD, bg);
-            if (i == 0) {
-                txt_str(2, r, "RECHARGE ENERGY", C_GREEN, bg);
-                if (need == 0) txt_str(24, r, "FULL", C_DIM, bg);
-                else { txt_str(23, r, "$", C_GOLD, bg); txt_num(24, r, ecost, 4, C_WHITE, bg); }
-            } else if (i == 1) {
-                txt_str(2, r, "HULL +5 MAX EN", C_CYAN, bg);
-                if (g_voy.u_hull >= EN_UPS_MAX) txt_str(24, r, "MAXED", C_GOLD, bg);
-                else { txt_str(23, r, "$", C_GOLD, bg); txt_num(24, r, hcost, 4, C_WHITE, bg); }
-            } else {
-                txt_str(2, r, "CARGO HOLDS +5", C_CYAN, bg);
-                if (g_voy.u_holds >= 2) txt_str(24, r, "MAXED", C_GOLD, bg);
-                else { txt_str(23, r, "$", C_GOLD, bg); txt_num(24, r, ccost, 4, C_WHITE, bg); }
-            }
-        }
         txt_str(2, 16, "HULL: ", C_GREY, C_PANEL);
         txt_num(8, 16, g_voy.energy, 3, C_GREEN, C_PANEL);
         txt_put(11, 16, '/', C_DIM, C_PANEL);
@@ -168,26 +183,11 @@ static void port_draw(void)
         txt_str(2, 6, "SAFE SPACE BANK (KEPT IF ARK LOST)", C_GOLD, C_PANEL);
         txt_str(2, 8, "SAVINGS BALANCE: $", C_GREY, C_PANEL);
         txt_num(20, 8, g_voy.bank, 6, C_GREEN, C_PANEL);
-        static const char *const blbl[4] = {
-            "DEPOSIT $100", "DEPOSIT ALL", "WITHDRAW $100", "WITHDRAW ALL"
-        };
-        for (uint8_t i = 0; i < 4; i++) {
-            uint8_t r = (uint8_t)(10 + i);
-            bool sel = (pt_sel == i);
-            uint8_t bg = sel ? C_FRAME : C_PANEL;
-            if (sel) for (uint8_t x = 1; x < 39; x++) txt_put(x, r, ' ', C_WHITE, bg);
-            txt_str(1, r, sel ? ">" : " ", C_GOLD, bg);
-            txt_str(2, r, blbl[i], C_WHITE, bg);
-        }
     }
 
-    /* Leave Port line */
-    uint8_t lidx = (uint8_t)(tab_lines() - 1);
-    bool lsel = (pt_sel == lidx);
-    uint8_t lbg = lsel ? C_FRAME : C_PANEL;
-    if (lsel) for (uint8_t x = 1; x < 39; x++) txt_put(x, 19, ' ', C_WHITE, lbg);
-    txt_str(1, 19, lsel ? ">" : " ", C_GOLD, lbg);
-    txt_str(2, 19, "LEAVE STARPORT", C_ORANGE, lbg);
+    uint8_t n = tab_lines();
+    for (uint8_t i = 0; i < n; i++)
+        port_draw_row(i);
 
     /* Status / Message box */
     txt_box(0, 22, 40, 5, C_CYAN, C_PANEL);
@@ -233,13 +233,17 @@ bool port_update(void)
     uint8_t n = tab_lines();
 
     if (in_pressed & IN_UP) {
+        uint8_t old = pt_sel;
         pt_sel = (pt_sel == 0) ? (uint8_t)(n - 1) : (uint8_t)(pt_sel - 1);
         sfx_player(SFX_BLIP, SFX_PRI_LOW);
-        port_draw();
+        port_draw_row(old);
+        port_draw_row(pt_sel);
     } else if (in_pressed & IN_DOWN) {
+        uint8_t old = pt_sel;
         pt_sel = (uint8_t)((pt_sel + 1) % n);
         sfx_player(SFX_BLIP, SFX_PRI_LOW);
-        port_draw();
+        port_draw_row(old);
+        port_draw_row(pt_sel);
     } else if (in_pressed & IN_BTN2) {
         pt_tab = (uint8_t)((pt_tab + 1) % pt_ntabs);
         pt_sel = 0;
