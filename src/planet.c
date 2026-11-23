@@ -26,7 +26,9 @@
 
 #define MAX_CREATURES 4
 #define MAX_CRATES    3
-#define NUM_TOWERS    8
+#define NUM_TOWERS    4
+#define TOWER_SPACING 256
+#define TOWER_OFFSET  128
 
 /* Shuttle states */
 #define SHU_DOCKED   0
@@ -157,16 +159,16 @@ static void build_planet_maps(void)
     }
 
     /* Compute rolling ground heights for 128 columns (tile row 22 = y 192, row 23 = y 200) */
-    /* Towers sit at columns 8, 24, 40, 56, 72, 88, 104, 120 (every 16 tiles = 128px) */
+    /* 4 towers sit at columns 16, 48, 80, 112 (every 32 tiles = 256px, always >=1 on 320px screen) */
     uint8_t h_tier[128]; /* 0=high (y=192), 1=mid (y=196), 2=low (y=200) */
     for (uint8_t c = 0; c < 128; c++) {
-        uint8_t mod = c & 15u;
-        if (mod >= 6 && mod <= 10) {
+        uint8_t mod = c & 31u;
+        if (mod >= 14 && mod <= 18) {
             h_tier[c] = 0; /* Flat high plateau for tower */
-        } else if (mod == 11 || mod == 5) {
+        } else if (mod == 13 || mod == 19) {
             h_tier[c] = 1;
         } else {
-            h_tier[c] = ((c >> 4) & 1u) ? 2 : 1;
+            h_tier[c] = ((c >> 3) & 1u) ? 2 : 1;
         }
         ground_y[c] = (uint8_t)(192 + h_tier[c] * 4);
     }
@@ -174,7 +176,7 @@ static void build_planet_maps(void)
     /* Plane 1: 128x26 wrapping terrain & towers (rows 0..25 -> y = 16..223) */
     for (uint8_t r = 0; r < PGND_MAP_ROWS; r++) {
         for (uint8_t c = 0; c < PGND_MAP_COLS; c++) {
-            bool is_tower = ((c & 15u) == 8u);
+            bool is_tower = ((c & 31u) == 16u);
             uint8_t t = 0; /* transparent sky */
             if (is_tower && r == 10) {
                 t = 13; /* tower cap at y=96 */
@@ -322,8 +324,10 @@ static void planet_hud_draw(void)
     hud_top_str(2, 1, "SCANNER", C_DIM);
     hud_top_put(sc0 - 1, 1, '[', C_FRAME, C_PANEL);
     hud_top_put(sc0 + 16, 1, ']', C_FRAME, C_PANEL);
-    for (uint8_t i = 0; i < 16; i++)
-        hud_top_put((uint8_t)(sc0 + i), 1, (i & 1) ? 179 : '.', (i & 1) ? C_DIM : C_FRAME, C_PANEL);
+    for (uint8_t i = 0; i < 16; i++) {
+        bool tow = ((i & 3u) == 2u);
+        hud_top_put((uint8_t)(sc0 + i), 1, tow ? 179 : '.', tow ? C_DIM : C_FRAME, C_PANEL);
+    }
 
     /* Ark on scanner (cell 8) */
     hud_top_put((uint8_t)(sc0 + 8), 1, 'A', C_GOLD, C_PANEL);
@@ -966,7 +970,7 @@ static void planet_render(void)
     uint16_t gp = (uint16_t)(XRAM_IMG_GUN + gf * GUN_FRAME_BYTES);
     uint8_t wpal = (uint8_t)(PAL_WORLD_0 + p_world);
     for (uint8_t t = 0; t < NUM_TOWERS && idx < SPR_TOTAL_COUNT; t++) {
-        int16_t twx = (int16_t)(64 + t * 128);
+        int16_t twx = (int16_t)(TOWER_OFFSET + t * TOWER_SPACING);
         int16_t sx = wrap_dx(twx, shu_wx) + SCREEN_W / 2;
         if (sx >= -12 && sx < SCREEN_W + 12) {
             spr_place(idx++, gp, wpal, MODE5_SIZE(GUN_W, GUN_H), MODE5_4BPP, sx - 4, gun_y - 4);
