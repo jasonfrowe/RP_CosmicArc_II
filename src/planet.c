@@ -1001,6 +1001,29 @@ static void planet_render(void)
             spr_place(idx++, (uint16_t)(XRAM_IMG_CARGO + cf * CARGO_FRAME_BYTES), PAL_CREATURES,
                       MODE5_SIZE(12, 12), MODE5_4BPP, SCREEN_W / 2 - 6, shu_y + 6);
         }
+    } else if (shu_st == SHU_DEAD && shu_rebuild_tm > 118u) {
+        /* 32-frame multi-burst shuttle explosion animation */
+        uint8_t age = (uint8_t)(150u - shu_rebuild_tm);
+        if (age < 16u && idx < SPR_TOTAL_COUNT) {
+            uint8_t f = age >> 2;
+            spr_place(idx++, (uint16_t)(XRAM_IMG_BOOM + f * BOOM_FRAME_BYTES), PAL_ROCK,
+                      MODE5_SIZE(BOOM_W, BOOM_H), MODE5_4BPP, SCREEN_W / 2 - 8, shu_y - 8);
+        }
+        if (age >= 4u && age < 24u && idx + 1 < SPR_TOTAL_COUNT) {
+            uint8_t a2 = (uint8_t)(age - 4u);
+            uint8_t f = (a2 / 5u) & 3u;
+            int16_t sp = (int16_t)(4 + (a2 >> 1));
+            uint16_t bp = (uint16_t)(XRAM_IMG_BOOM + f * BOOM_FRAME_BYTES);
+            spr_place(idx++, bp, PAL_ROCK, MODE5_SIZE(BOOM_W, BOOM_H), MODE5_4BPP,
+                      SCREEN_W / 2 - 8 - sp, shu_y - 8 - (sp >> 1));
+            spr_place(idx++, bp, PAL_ROCK, MODE5_SIZE(BOOM_W, BOOM_H), MODE5_4BPP,
+                      SCREEN_W / 2 - 8 + sp, shu_y - 8 + (sp >> 1));
+        }
+        if (age >= 12u && age < 32u && idx < SPR_TOTAL_COUNT) {
+            uint8_t f = ((uint8_t)(age - 12u) / 5u) & 3u;
+            spr_place(idx++, (uint16_t)(XRAM_IMG_BOOM + f * BOOM_FRAME_BYTES), PAL_ROCK,
+                      MODE5_SIZE(BOOM_W, BOOM_H), MODE5_4BPP, SCREEN_W / 2 - 12, shu_y - 2);
+        }
     }
 
     /* Creatures */
