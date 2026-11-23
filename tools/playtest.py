@@ -37,15 +37,17 @@ def main():
             f'shot "{out}/m4_sector.png"\n'
             f'press z\nrun 2\nrelease z\nrun 15\n'
             f'shot "{out}/m4_port.png"\n'
-            f'press escape\nrun 2\nrelease escape\nrun 10\n'
+            f'press x\nrun 2\nrelease x\nrun 10\n'
             f'press s\nrun 2\nrelease s\nrun 5\n'
             f'press z\nrun 2\nrelease z\nrun 12\n'
-            f'press x\nrun 2\nrelease x\nrun 12\n'
+            f'press e\nrun 2\nrelease e\nrun 12\n'
             f'shot "{out}/m4_chart.png"\n'
-            f'press x\nrun 2\nrelease x\nrun 12\n'
+            f'press e\nrun 2\nrelease e\nrun 12\n'
             f'shot "{out}/m4_closeup.png"\n'
-            f'press x\nrun 2\nrelease x\nrun 12\n'
-            f'shot "{out}/m4_achieve.png"\n',
+            f'press e\nrun 2\nrelease e\nrun 12\n'
+            f'shot "{out}/m4_achieve.png"\n'
+            f'press q\nrun 2\nrelease q\nrun 12\n'
+            f'press x\nrun 2\nrelease x\nrun 12\n',
             save_dir=sdir,
             seed=42,
         )

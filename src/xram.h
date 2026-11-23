@@ -133,7 +133,7 @@ typedef struct {
 /* Layer & Sprite Dimensions                                          */
 /* ------------------------------------------------------------------ */
 
-#define SPR_TOTAL_COUNT 48
+#define SPR_TOTAL_COUNT 40
 
 /* Fullscreen 40x30 Mode 1 text buffer (used for menus, map, chart, port, achievements) */
 #define TXT_COLS 40

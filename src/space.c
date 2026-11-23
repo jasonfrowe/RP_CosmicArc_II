@@ -27,12 +27,12 @@
 #define BAY_X       ARK_CX
 #define BAY_Y       (ARK_CY + 18)
 
-#define MAX_ROCKS   12
+#define MAX_ROCKS   10
 #define MAX_BOLTS   6
-#define MAX_SHOTS   10
+#define MAX_SHOTS   8
 #define MAX_PIRATES 6
 #define MAX_PODS    3
-#define MAX_BOOMS   6
+#define MAX_BOOMS   4
 
 #define SHOT_COST   1
 #define KILL_PAY    1
@@ -147,9 +147,9 @@ typedef struct {
 /* Module State                                                       */
 /* ------------------------------------------------------------------ */
 
-static rock_t   rocks[MAX_ROCKS];
-static bolt_t   bolts[MAX_BOLTS];
-static shot_t   shots[MAX_SHOTS];
+#define rocks  ((rock_t *)(g_arena))
+#define bolts  ((bolt_t *)(g_arena + 128))
+#define shots  ((shot_t *)(g_arena + 176))
 static pirate_t pirates[MAX_PIRATES];
 static pod_t    pods[MAX_PODS];
 static boom_t   booms[MAX_BOOMS];
@@ -443,9 +443,7 @@ static void space_hud_draw(void)
 
 void space_enter(uint8_t wave, bool quick_mode)
 {
-    memset(rocks, 0, sizeof(rocks));
-    memset(bolts, 0, sizeof(bolts));
-    memset(shots, 0, sizeof(shots));
+    memset(g_arena, 0, sizeof(g_arena));
     memset(pirates, 0, sizeof(pirates));
     memset(pods, 0, sizeof(pods));
     memset(booms, 0, sizeof(booms));
@@ -1150,12 +1148,12 @@ space_result_t space_update(void)
         /* Let final explosions finish animating cleanly */
         for (uint8_t i = 0; i < MAX_BOOMS; i++)
             if (booms[i].timer > 0) booms[i].timer--;
-        memset(bolts, 0, sizeof(bolts));
-        memset(shots, 0, sizeof(shots));
+        memset(bolts, 0, sizeof(bolt_t) * MAX_BOLTS);
+        memset(shots, 0, sizeof(shot_t) * MAX_SHOTS);
         memset(pods, 0, sizeof(pods));
         if (--s_timer == 0) {
             msg_clear();
-            memset(rocks, 0, sizeof(rocks));
+            memset(rocks, 0, sizeof(rock_t) * MAX_ROCKS);
             memset(pirates, 0, sizeof(pirates));
             memset(booms, 0, sizeof(booms));
             s_state = SS_DEPART;

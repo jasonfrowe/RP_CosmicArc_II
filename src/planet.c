@@ -77,9 +77,9 @@ typedef struct {
 /* Module State                                                       */
 /* ------------------------------------------------------------------ */
 
-static creature_t creatures[MAX_CREATURES];
-static crate_t    crates[MAX_CRATES];
-static uint8_t    ground_y[128]; /* surface pixel Y per 8px column */
+#define ground_y  ((uint8_t *)(g_arena))
+#define creatures ((creature_t *)(g_arena + 128))
+#define crates    ((crate_t *)(g_arena + 192))
 
 static uint8_t  p_state;
 static uint8_t  p_world;
@@ -139,8 +139,8 @@ static int16_t ground_at(int16_t wx)
 
 static void build_planet_maps(void)
 {
-    /* Plane 0: 64x26 wrapping sky with stars and distant hills */
-    uint8_t row[PGND_MAP_COLS];
+    /* Plane 0: 64x26 wrapping sky with stars and distant hills (reuse idle spr[] buffer) */
+    uint8_t *row = (uint8_t *)spr;
     uint16_t s = (uint16_t)(0x3175u + p_world * 911u + p_sector * 37u);
     for (uint8_t r = 0; r < PSKY_MAP_ROWS; r++) {
         for (uint8_t c = 0; c < PSKY_MAP_COLS; c++) {
@@ -161,46 +161,52 @@ static void build_planet_maps(void)
 
     /* Compute rolling ground heights for 128 columns (tile row 22 = y 192, row 23 = y 200) */
     /* 4 towers sit at columns 16, 48, 80, 112 (every 32 tiles = 256px, always >=1 on 320px screen) */
-    uint8_t h_tier[128]; /* 0=high (y=192), 1=mid (y=196), 2=low (y=200) */
     for (uint8_t c = 0; c < 128; c++) {
         uint8_t mod = c & 31u;
+        uint8_t ht;
         if (mod >= 14 && mod <= 18) {
-            h_tier[c] = 0; /* Flat high plateau for tower */
+            ht = 0; /* Flat high plateau for tower */
         } else if (mod == 13 || mod == 19) {
-            h_tier[c] = 1;
+            ht = 1;
         } else {
-            h_tier[c] = ((c >> 3) & 1u) ? 2 : 1;
+            ht = ((c >> 3) & 1u) ? 2 : 1;
         }
-        ground_y[c] = (uint8_t)(192 + h_tier[c] * 4);
+        ground_y[c] = (uint8_t)(192 + ht * 4);
     }
 
     /* Plane 1: 128x26 wrapping terrain & towers (rows 0..25 -> y = 16..223) */
     for (uint8_t r = 0; r < PGND_MAP_ROWS; r++) {
-        for (uint8_t c = 0; c < PGND_MAP_COLS; c++) {
-            bool is_tower = ((c & 31u) == 16u);
-            uint8_t t = 0; /* transparent sky */
-            if (is_tower && r == 10) {
-                t = 13; /* tower cap at y=96 */
-            } else if (is_tower && r > 10 && r < 22) {
-                t = 12; /* tower shaft y=104..191 */
-            } else if (is_tower && r == 22) {
-                t = 14; /* tower base on ground */
-            } else if (r == 22) {
-                if (h_tier[c] == 0) t = 6;
-                else if (h_tier[c] == 1) t = 7;
-                else t = 0;
-            } else if (r == 23) {
-                if (h_tier[c] == 2) t = 6;
-                else t = 10;
-            } else if (r == 24) {
-                t = 10;
-            } else if (r == 25) {
-                t = 11;
+        for (uint8_t half = 0; half < 2; half++) {
+            uint8_t base_c = (uint8_t)(half * 64u);
+            for (uint8_t i = 0; i < 64; i++) {
+                uint8_t c = (uint8_t)(base_c + i);
+                bool is_tower = ((c & 31u) == 16u);
+                uint8_t ht = (uint8_t)((ground_y[c] - 192u) >> 2);
+                uint8_t t = 0; /* transparent sky */
+                if (is_tower && r == 10) {
+                    t = 13; /* tower cap at y=96 */
+                } else if (is_tower && r > 10 && r < 22) {
+                    t = 12; /* tower shaft y=104..191 */
+                } else if (is_tower && r == 22) {
+                    t = 14; /* tower base on ground */
+                } else if (r == 22) {
+                    if (ht == 0) t = 6;
+                    else if (ht == 1) t = 7;
+                    else t = 0;
+                } else if (r == 23) {
+                    if (ht == 2) t = 6;
+                    else t = 10;
+                } else if (r == 24) {
+                    t = 10;
+                } else if (r == 25) {
+                    t = 11;
+                }
+                row[i] = t;
             }
-            row[c] = t;
+            xram0_write((uint16_t)(XRAM_MAP_PGND + (uint16_t)r * PGND_MAP_COLS + base_c), row, 64);
         }
-        xram0_write((uint16_t)(XRAM_MAP_PGND + (uint16_t)r * PGND_MAP_COLS), row, PGND_MAP_COLS);
     }
+    spr_hide_all();
 }
 
 /* ------------------------------------------------------------------ */
@@ -417,8 +423,8 @@ static void planet_hud_draw(void)
 
 void planet_enter(uint8_t world_idx, uint8_t level, uint8_t pop, bool has_relic, uint8_t sector_idx)
 {
-    memset(creatures, 0, sizeof(creatures));
-    memset(crates, 0, sizeof(crates));
+    memset(creatures, 0, sizeof(creature_t) * MAX_CREATURES);
+    memset(crates, 0, sizeof(crate_t) * MAX_CRATES);
 
     p_world = (world_idx < NUM_WORLDS) ? world_idx : 0;
     p_level = (level < 1) ? 1 : (level > 5 ? 5 : level);

@@ -34,6 +34,7 @@ void spr_place(uint8_t idx, uint16_t img_addr, uint8_t pal, uint8_t wh,
 
 /* Fullscreen 40x30 Mode 1 text (VID_MODE_MENU) */
 void txt_clear(uint8_t bg);
+void txt_fill(uint8_t col, uint8_t row, uint8_t w, uint8_t bg);
 void txt_put(uint8_t col, uint8_t row, uint8_t ch, uint8_t fg, uint8_t bg);
 void txt_str(uint8_t col, uint8_t row, const char *s, uint8_t fg, uint8_t bg);
 void txt_center(uint8_t row, const char *s, uint8_t fg, uint8_t bg);

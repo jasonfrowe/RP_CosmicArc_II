@@ -114,6 +114,7 @@ extern game_mode_t g_mode;
 extern voyage_t    g_voy;
 extern galaxy_t    g_gx;
 extern uint8_t     g_frame;
+extern uint8_t     g_arena[256]; /* Shared scratch/entity arena for space & planet */
 extern uint8_t     g_save_slot;
 extern uint8_t     g_pending_ach; /* 0xFF if none, else newly earned ach id */
 extern volatile uint16_t lag_frames;

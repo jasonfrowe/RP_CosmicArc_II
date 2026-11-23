@@ -20,6 +20,7 @@ game_mode_t g_mode = GM_TITLE;
 voyage_t    g_voy;
 galaxy_t    g_gx;
 uint8_t     g_frame = 0;
+uint8_t     g_arena[256];
 uint8_t     g_save_slot = 0;
 uint8_t     g_pending_ach = 0xFFu;
 volatile uint16_t lag_frames = 0;
@@ -119,6 +120,7 @@ static uint8_t title_sel = 0;
 static uint16_t title_ticks = 0;
 static uint8_t slot_mode = 0; /* 0=main menu, 1=pick slot new, 2=pick slot continue */
 static uint8_t slot_sel = 0;
+static bool slot_confirm_erase = false;
 static save_info_t slot_info[SAVE_SLOTS];
 
 static const char *const title_items[] = {
@@ -155,7 +157,7 @@ static void slot_draw_item(uint8_t i)
     uint8_t row = (uint8_t)(18 + i * 2);
     bool sel = (i == slot_sel);
     uint8_t bg = sel ? C_FRAME : C_PANEL;
-    txt_str(2, row, "                                    ", C_WHITE, bg);
+    txt_fill(2, row, 36, bg);
     txt_str(3, row, sel ? ">" : " ", C_GOLD, bg);
     txt_str(4, row, "SLOT ", C_CYAN, bg);
     txt_num(9, row, (uint32_t)(i + 1), 1, C_WHITE, bg);
@@ -173,6 +175,16 @@ static void slot_draw_item(uint8_t i)
     }
 }
 
+static void slot_draw_footer(void)
+{
+    txt_fill(0, 26, 40, C_TRANS);
+    if (slot_confirm_erase) {
+        txt_center(26, "ERASE THIS SLOT?  [A] YES   [B] NO", C_RED, C_FRAME);
+    } else {
+        txt_center(26, "A:SELECT   B:BACK   X:ERASE SLOT", C_DIM, C_TRANS);
+    }
+}
+
 static void title_draw_menu(void)
 {
     txt_clear(C_TRANS);
@@ -184,15 +196,15 @@ static void title_draw_menu(void)
     if (slot_mode == 0) {
         for (uint8_t i = 0; i < TITLE_NITEMS; i++)
             title_draw_item(i);
-        txt_center(25, "ARROWS/WASD: MOVE   Z/SPACE: FIRE/BEAM", C_DIM, C_TRANS);
-        txt_center(26, "X/K: FIGHTER/DROP/CHART   ENTER: START", C_DIM, C_TRANS);
+        txt_center(25, "D-PAD/WASD: MOVE    A/Z: FIRE/SELECT", C_DIM, C_TRANS);
+        txt_center(26, "B/X/ESC: FIGHTER/BACK   L1/R1(Q/E): TABS", C_DIM, C_TRANS);
         txt_center(28, "PICOCOMPUTER 6502  -  OPL2 FM AUDIO", C_TEAL, C_TRANS);
     } else {
         txt_center(15, slot_mode == 1 ? "SELECT SLOT FOR NEW VOYAGE" : "SELECT VOYAGE TO CONTINUE",
                    C_GOLD, C_PANEL);
         for (uint8_t i = 0; i < SAVE_SLOTS; i++)
             slot_draw_item(i);
-        txt_center(26, "[Z] SELECT    [X] BACK    [ESC] ERASE", C_DIM, C_TRANS);
+        slot_draw_footer();
     }
 }
 
@@ -200,6 +212,7 @@ static void enter_title(void)
 {
     g_mode = GM_TITLE;
     slot_mode = 0;
+    slot_confirm_erase = false;
     title_ticks = 0;
     quick_run = false;
     video_set_mode(VID_MODE_MENU, 0);
@@ -234,17 +247,19 @@ static void title_update(void)
             sfx_player(SFX_BLIP, SFX_PRI_LOW);
             title_draw_item(old);
             title_draw_item(title_sel);
-        } else if (in_pressed & (IN_FIRE | IN_START)) {
+        } else if (in_pressed & (IN_A | IN_START)) {
             sfx_player(SFX_DOCK, SFX_PRI_EVENT);
             if (title_sel == 0) {
                 probe_all_slots();
                 slot_mode = 1;
                 slot_sel = 0;
+                slot_confirm_erase = false;
                 title_draw_menu();
             } else if (title_sel == 1) {
                 probe_all_slots();
                 slot_mode = 2;
                 slot_sel = 0;
+                slot_confirm_erase = false;
                 title_draw_menu();
             } else if (title_sel == 2) {
                 quick_run = true;
@@ -259,6 +274,21 @@ static void title_update(void)
             }
         }
     } else {
+        if (slot_confirm_erase) {
+            if (in_pressed & IN_A) {
+                save_erase(slot_sel);
+                probe_all_slots();
+                slot_confirm_erase = false;
+                sfx_player(SFX_DENY, SFX_PRI_LOW);
+                slot_draw_item(slot_sel);
+                slot_draw_footer();
+            } else if (in_pressed & (IN_B | IN_X | IN_SELECT)) {
+                slot_confirm_erase = false;
+                sfx_player(SFX_BLIP, SFX_PRI_LOW);
+                slot_draw_footer();
+            }
+            return;
+        }
         if (in_pressed & IN_UP) {
             uint8_t old = slot_sel;
             slot_sel = (slot_sel == 0) ? (SAVE_SLOTS - 1) : (uint8_t)(slot_sel - 1);
@@ -271,16 +301,19 @@ static void title_update(void)
             sfx_player(SFX_BLIP, SFX_PRI_LOW);
             slot_draw_item(old);
             slot_draw_item(slot_sel);
-        } else if (in_pressed & IN_BTN2) {
+        } else if (in_pressed & IN_B) {
             slot_mode = 0;
             sfx_player(SFX_BLIP, SFX_PRI_LOW);
             title_draw_menu();
-        } else if (in_pressed & IN_START) {
-            save_erase(slot_sel);
-            probe_all_slots();
-            sfx_player(SFX_DENY, SFX_PRI_LOW);
-            slot_draw_item(slot_sel);
-        } else if (in_pressed & IN_FIRE) {
+        } else if (in_pressed & (IN_X | IN_SELECT)) {
+            if (slot_info[slot_sel].valid) {
+                slot_confirm_erase = true;
+                sfx_player(SFX_BLIP, SFX_PRI_LOW);
+                slot_draw_footer();
+            } else {
+                sfx_player(SFX_DENY, SFX_PRI_LOW);
+            }
+        } else if (in_pressed & IN_A) {
             g_save_slot = slot_sel;
             if (slot_mode == 1) {
                 uint32_t seed = rng_state() ^ ((uint32_t)title_ticks << 16) ^ ((uint32_t)ria_vsync() << 8) ^ 0xA5A55A5Au;
@@ -380,12 +413,14 @@ int main(void)
             }
             break;
 
-        case GM_ACHIEVE:
-            if (achieve_update()) {
+        case GM_ACHIEVE: {
+            ach_action_t a = achieve_update();
+            if (a != ACH_STAY) {
                 g_mode = GM_MAP;
-                map_enter();
+                map_enter_tab(a == ACH_PREV ? 2 : 0);
             }
             break;
+        }
 
         case GM_SPACE: {
             space_result_t r = space_update();

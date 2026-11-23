@@ -12,25 +12,30 @@ static const struct {
     uint8_t key;
     uint16_t bits;
 } keymap[] = {
-    {HID_KEY_ARROW_UP,    IN_UP},
-    {HID_KEY_ARROW_DOWN,  IN_DOWN},
-    {HID_KEY_ARROW_LEFT,  IN_LEFT},
-    {HID_KEY_ARROW_RIGHT, IN_RIGHT},
-    {HID_KEY_W,           IN_UP},
-    {HID_KEY_S,           IN_DOWN},
-    {HID_KEY_A,           IN_LEFT},
-    {HID_KEY_D,           IN_RIGHT},
-    {HID_KEY_Z,           IN_FIRE},
-    {HID_KEY_J,           IN_FIRE},
-    {HID_KEY_SPACE,       IN_FIRE},
-    {HID_KEY_X,           IN_BTN2},
-    {HID_KEY_K,           IN_BTN2},
-    {HID_KEY_C,           IN_BTN2},
-    {HID_KEY_M,           IN_BTN2},
-    {HID_KEY_TAB,         IN_BTN2},
-    {HID_KEY_ENTER,       IN_START},
-    {HID_KEY_P,           IN_START},
-    {HID_KEY_ESCAPE,      IN_START},
+    {HID_KEY_ARROW_UP,      IN_UP},
+    {HID_KEY_ARROW_DOWN,    IN_DOWN},
+    {HID_KEY_ARROW_LEFT,    IN_LEFT},
+    {HID_KEY_ARROW_RIGHT,   IN_RIGHT},
+    {HID_KEY_W,             IN_UP},
+    {HID_KEY_S,             IN_DOWN},
+    {HID_KEY_A,             IN_LEFT},
+    {HID_KEY_D,             IN_RIGHT},
+    {HID_KEY_Z,             IN_A},
+    {HID_KEY_J,             IN_A},
+    {HID_KEY_SPACE,         IN_A},
+    {HID_KEY_ENTER,         IN_A},
+    {HID_KEY_X,             IN_B},
+    {HID_KEY_ESCAPE,        IN_B},
+    {HID_KEY_BACKSPACE,     IN_B},
+    {HID_KEY_C,             IN_X},
+    {HID_KEY_K,             IN_X},
+    {HID_KEY_Q,             IN_L1},
+    {HID_KEY_BRACKET_LEFT,  IN_L1},
+    {HID_KEY_E,             IN_R1},
+    {HID_KEY_BRACKET_RIGHT, IN_R1},
+    {HID_KEY_TAB,           IN_R1},
+    {HID_KEY_P,             IN_START},
+    {HID_KEY_DELETE,        IN_SELECT},
 };
 
 static const struct {
@@ -38,14 +43,15 @@ static const struct {
     uint8_t mask;
     uint16_t bits;
 } padmap[] = {
-    {2, GAMEPAD_BTN0_A,      IN_FIRE},
-    {2, GAMEPAD_BTN0_R1,     IN_FIRE},
-    {2, GAMEPAD_BTN0_B,      IN_BTN2},
-    {2, GAMEPAD_BTN0_C,      IN_BTN2},
-    {2, GAMEPAD_BTN0_X,      IN_BTN2},
-    {2, GAMEPAD_BTN0_L1,     IN_BTN2},
+    {2, GAMEPAD_BTN0_A,      IN_A},
+    {2, GAMEPAD_BTN0_B,      IN_B},
+    {2, GAMEPAD_BTN0_C,      IN_X},
+    {2, GAMEPAD_BTN0_X,      IN_X},
+    {2, GAMEPAD_BTN0_Y,      IN_X},
+    {2, GAMEPAD_BTN0_L1,     IN_L1},
+    {2, GAMEPAD_BTN0_R1,     IN_R1},
     {3, GAMEPAD_BTN1_START,  IN_START},
-    {3, GAMEPAD_BTN1_SELECT, IN_BTN2},
+    {3, GAMEPAD_BTN1_SELECT, IN_SELECT},
 };
 
 void input_init(void)

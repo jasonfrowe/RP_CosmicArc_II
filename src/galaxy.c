@@ -30,6 +30,7 @@ static uint8_t mv_nitems = 0;
 static uint8_t mv_items[12]; /* 0..63=warp to sec, 0x80=land, 0x81=dock, 0x82=save */
 static uint8_t mv_item_dir[12];
 static uint8_t chart_cx = 5, chart_cy = 3;
+static bool mv_confirm_exit = false;
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                            */
@@ -106,15 +107,14 @@ void galaxy_generate(uint32_t seed)
 
     memset(&g_gx, 0, sizeof(g_gx));
 
-    /* Grid-indexed scratch */
-    uint8_t gc_warp[128];
-    int8_t  gc_sec[128];
-    uint8_t taken[GX_SECTORS];
-    uint8_t ext_cell[32], ext_dir[32];
+    /* Grid-indexed scratch (reuse idle spr[] buffer during galaxy generation) */
+    uint8_t *gc_warp = (uint8_t *)spr;
+    int8_t  *gc_sec  = (int8_t *)((uint8_t *)spr + 128);
+    uint8_t *taken   = (uint8_t *)spr + 256;
     uint8_t n_taken = 0, n_ext = 0;
 
-    memset(gc_warp, 0, sizeof(gc_warp));
-    memset(gc_sec, -1, sizeof(gc_sec));
+    memset(gc_warp, 0, 128);
+    memset(gc_sec, -1, 128);
 
     /* Start spanning tree at home cell (5, 3) */
     uint8_t home = (3u << 4) | 5u;
@@ -156,21 +156,16 @@ void galaxy_generate(uint32_t seed)
         if (gc_sec[nc] < 0) continue;
         gc_warp[c] |= (uint8_t)(1u << d);
         if (n_ext < 5) {
-            /* One-way warp */
-            ext_cell[n_ext] = c;
-            ext_dir[n_ext] = d;
             n_ext++;
         } else {
             gc_warp[nc] |= (uint8_t)(1u << ((d + 4u) & 7u));
         }
     }
-    (void)ext_cell;
-    (void)ext_dir;
 
-    /* BFS from home to number sectors 0..63 by distance */
-    uint8_t q[GX_SECTORS];
-    int8_t  cell_to_s[128];
-    memset(cell_to_s, -1, sizeof(cell_to_s));
+    /* BFS from home to number sectors 0..63 by distance (reuse taken[] & gc_sec[]) */
+    uint8_t *q = taken;
+    int8_t  *cell_to_s = gc_sec;
+    memset(cell_to_s, -1, 128);
     uint8_t qh = 0, qt = 0;
     q[qt++] = home;
     cell_to_s[home] = 0;
@@ -196,9 +191,9 @@ void galaxy_generate(uint32_t seed)
         g_gx.info[s] = (uint8_t)(tier << 6);
     }
 
-    /* Compute danger = jumps back to Safe Space (0..9) via reverse BFS */
-    uint8_t dist[GX_SECTORS];
-    memset(dist, 0xFF, sizeof(dist));
+    /* Compute danger = jumps back to Safe Space (0..9) via reverse BFS (reuse gc_warp[]) */
+    uint8_t *dist = gc_warp;
+    memset(dist, 0xFF, GX_SECTORS);
     qh = 0; qt = 0;
     for (uint8_t s = 0; s < 10; s++) {
         dist[s] = 0;
@@ -271,6 +266,7 @@ void galaxy_generate(uint32_t seed)
     if (g_voy.relic_sec == 0)
         g_voy.relic_sec = relic_cand;
 
+    spr_hide_all();
     rng_seed(saved_rng);
 }
 
@@ -390,7 +386,7 @@ static void draw_sector_item(uint8_t i)
     uint8_t row = (uint8_t)(10 + i);
     bool sel = (i == mv_sel);
     uint8_t bg = sel ? C_FRAME : C_PANEL;
-    txt_str(1, row, "                                      ", C_WHITE, bg);
+    txt_fill(1, row, 38, bg);
     if (sel) txt_str(2, row, ">", C_GOLD, bg);
 
     uint8_t it = mv_items[i];
@@ -429,6 +425,29 @@ static void draw_sector_item(uint8_t i)
     }
 }
 
+void galaxy_draw_tabs(uint8_t active)
+{
+    static const char *const tabs[4] = { "SECTOR", "CHART", "CLOSEUP", "ACHIEVE" };
+    static const uint8_t tx[4] = { 6, 13, 19, 27 };
+    txt_box(0, 0, 40, 3, C_CYAN, C_PANEL);
+    txt_str(1, 1, "[L1]", C_CYAN, C_PANEL);
+    txt_str(35, 1, "[R1]", C_CYAN, C_PANEL);
+    for (uint8_t i = 0; i < 4; i++) {
+        bool act = (i == active);
+        txt_str(tx[i], 1, tabs[i], act ? C_GOLD : C_GREY, act ? C_FRAME : C_PANEL);
+    }
+}
+
+static void draw_sector_footer(void)
+{
+    txt_fill(0, 29, 40, C_TRANS);
+    if (mv_confirm_exit) {
+        txt_center(29, "EXIT TO TITLE?  [A] YES   [B] NO", C_GOLD, C_FRAME);
+    } else {
+        txt_center(29, "A:SELECT   L1/R1:PAGES   B/START:TITLE", C_DIM, C_TRANS);
+    }
+}
+
 static void draw_sector_view(void)
 {
     uint8_t s = g_voy.sector;
@@ -436,41 +455,42 @@ static void draw_sector_view(void)
     uint8_t tier = sec_tier(s);
 
     txt_clear(C_TRANS);
-    txt_box(0, 0, 40, 5, C_CYAN, C_PANEL);
-    txt_str(2, 1, "SECTOR ", C_GREY, C_PANEL);
-    txt_num(9, 1, (uint32_t)(s + 1), 2, C_WHITE, C_PANEL);
-    txt_str(13, 1, tier_lbl[tier], tier_col[tier], C_PANEL);
-    txt_str(26, 1, "DAY ", C_GREY, C_PANEL);
-    txt_num(30, 1, g_voy.stardate, 4, C_GOLD, C_PANEL);
+    galaxy_draw_tabs(0);
+    txt_box(0, 3, 40, 4, C_FRAME, C_PANEL);
+    txt_str(2, 4, "SECTOR ", C_GREY, C_PANEL);
+    txt_num(9, 4, (uint32_t)(s + 1), 2, C_WHITE, C_PANEL);
+    txt_str(13, 4, tier_lbl[tier], tier_col[tier], C_PANEL);
+    txt_str(26, 4, "DAY ", C_GREY, C_PANEL);
+    txt_num(30, 4, g_voy.stardate, 4, C_GOLD, C_PANEL);
 
     if (t == GT_PORT) {
         char cls[4];
         fmt_port_class(cls, sec_sub(s));
-        txt_str(2, 3, "STARPORT CLASS: ", C_CYAN, C_PANEL);
-        txt_str(18, 3, cls, C_GOLD, C_PANEL);
+        txt_str(2, 5, "STARPORT CLASS: ", C_CYAN, C_PANEL);
+        txt_str(18, 5, cls, C_GOLD, C_PANEL);
     } else if (t == GT_PLANET) {
         uint8_t pop = galaxy_planet_pop(s);
-        txt_str(2, 3, "PLANET: ", C_GREEN, C_PANEL);
-        txt_str(10, 3, WORLD_NAMES[sec_sub(s)], C_WHITE, C_PANEL);
-        txt_str(16, 3, "L", C_GREY, C_PANEL);
-        txt_num(17, 3, galaxy_planet_level(s), 1, C_CYAN, C_PANEL);
+        txt_str(2, 5, "PLANET: ", C_GREEN, C_PANEL);
+        txt_str(10, 5, WORLD_NAMES[sec_sub(s)], C_WHITE, C_PANEL);
+        txt_str(16, 5, "L", C_GREY, C_PANEL);
+        txt_num(17, 5, galaxy_planet_level(s), 1, C_CYAN, C_PANEL);
         if (pop > 0) {
-            txt_str(20, 3, "LIFE ", C_GREEN, C_PANEL);
-            txt_num(25, 3, pop, 1, C_WHITE, C_PANEL);
+            txt_str(20, 5, "LIFE ", C_GREEN, C_PANEL);
+            txt_num(25, 5, pop, 1, C_WHITE, C_PANEL);
         } else {
-            txt_str(20, 3, "BARREN", C_RED, C_PANEL);
+            txt_str(20, 5, "BARREN", C_RED, C_PANEL);
         }
         if (s == g_voy.relic_sec && g_voy.relic_state == 0)
-            txt_str(28, 3, "RELIC!", C_MAGENTA, C_PANEL);
+            txt_str(28, 5, "RELIC!", C_MAGENTA, C_PANEL);
     } else if (t == GT_NEBULA) {
-        txt_str(2, 3, "NEBULA - HIGH PIRATE ACTIVITY", C_MAGENTA, C_PANEL);
+        txt_str(2, 5, "NEBULA - HIGH PIRATE ACTIVITY", C_MAGENTA, C_PANEL);
     } else {
-        txt_str(2, 3, "DEEP SPACE - EMPTY SECTOR", C_DIM, C_PANEL);
+        txt_str(2, 5, "DEEP SPACE - EMPTY SECTOR", C_DIM, C_PANEL);
     }
 
     if (g_pending_ach < ACH_COUNT) {
-        txt_str(2, 6, "ACHIEVEMENT UNLOCKED: ", C_GOLD, C_PANEL);
-        txt_str(24, 6, ACH_NAMES[g_pending_ach], C_GREEN, C_PANEL);
+        txt_str(2, 7, "ACHIEVEMENT UNLOCKED: ", C_GOLD, C_PANEL);
+        txt_str(24, 7, ACH_NAMES[g_pending_ach], C_GREEN, C_PANEL);
     }
 
     /* Action & Warp list */
@@ -501,7 +521,7 @@ static void draw_sector_view(void)
     txt_str(20, 26, "BANK:$", C_GOLD, C_PANEL);
     txt_num(26, 26, g_voy.bank, 6, C_WHITE, C_PANEL);
 
-    txt_center(29, "[Z] SELECT   [X] STAR CHART   [ESC] MENU", C_DIM, C_TRANS);
+    draw_sector_footer();
 }
 
 static void draw_chart_cursor(uint8_t cx, uint8_t cy, bool show)
@@ -526,15 +546,29 @@ static void chart_set_diag(uint8_t col, uint8_t row, uint8_t tile)
         chart_bg_tile(col, row, tile);
 }
 
+static bool is_reachable_neighbor(uint8_t dest)
+{
+    uint8_t s = g_voy.sector;
+    for (uint8_t d = 0; d < 8; d++) {
+        if (neighbor_sector(s, d) == (int8_t)dest) return true;
+    }
+    return false;
+}
+
 static void draw_chart_inspect(void)
 {
     for (uint8_t r = 22; r <= 25; r++)
-        txt_str(1, r, "                                      ", C_WHITE, C_PANEL);
+        txt_fill(1, r, 38, C_PANEL);
     int8_t hs = sector_at_cell(chart_cx, chart_cy);
     if (hs >= 0 && (g_voy.visited[hs] & 3u)) {
         txt_str(2, 22, "SECTOR ", C_GREY, C_PANEL);
         txt_num(9, 22, (uint32_t)(hs + 1), 2, C_WHITE, C_PANEL);
         txt_str(13, 22, tier_lbl[sec_tier((uint8_t)hs)], tier_col[sec_tier((uint8_t)hs)], C_PANEL);
+        if ((uint8_t)hs == g_voy.sector) {
+            txt_str(27, 22, "YOU ARE HERE", C_GOLD, C_PANEL);
+        } else if (is_reachable_neighbor((uint8_t)hs)) {
+            txt_str(30, 22, "[A] WARP", C_GREEN, C_FRAME);
+        }
         if (g_voy.visited[hs] & 1u) {
             uint8_t t = sec_type((uint8_t)hs);
             if (t == GT_PORT) {
@@ -565,8 +599,7 @@ static void draw_star_chart(void)
     video_set_mode(VID_MODE_CHART, 0);
     chart_bg_clear();
     txt_clear(C_TRANS);
-    txt_box(0, 0, 40, 3, C_CYAN, C_PANEL);
-    txt_center(1, "GALACTIC STAR CHART (12x8)", C_GOLD, C_PANEL);
+    galaxy_draw_tabs(1);
 
     /* Draw ALL 8 hyperlane directions from every visited sector on 4bpp Plane 1 */
     static const uint8_t d_tile[8] = {
@@ -617,15 +650,14 @@ static void draw_star_chart(void)
     draw_chart_inspect();
 
     txt_center(28, "GOLD:ARK  CYAN:PORT  GRN:PLANET  MAG:NEB", C_GREY, C_TRANS);
-    txt_center(29, "ARROWS: INSPECT  [X] CLOSE-UP  [Z] BACK", C_DIM, C_TRANS);
+    txt_center(29, "A:WARP   B:BACK   L1/R1:PAGES", C_DIM, C_TRANS);
 }
 
 static void draw_closeup_chart(void)
 {
     video_set_mode(VID_MODE_MENU, 0);
     txt_clear(C_TRANS);
-    txt_box(0, 0, 40, 3, C_CYAN, C_PANEL);
-    txt_center(1, "CLOSE-UP SECTOR CIRCUIT", C_GOLD, C_PANEL);
+    galaxy_draw_tabs(2);
 
     int8_t ax = (int8_t)(g_gx.cell[g_voy.sector] & 0x0Fu);
     int8_t ay = (int8_t)(g_gx.cell[g_voy.sector] >> 4);
@@ -688,23 +720,59 @@ static void draw_closeup_chart(void)
         }
     }
 
-    txt_center(29, "[X] ACHIEVEMENTS    [Z] BACK TO SECTOR", C_DIM, C_TRANS);
+    txt_center(29, "B:BACK TO SECTOR     L1/R1:PAGES", C_DIM, C_TRANS);
 }
 
 /* ------------------------------------------------------------------ */
 /* Public Map Loop                                                    */
 /* ------------------------------------------------------------------ */
 
-void map_enter(void)
+static map_action_t perform_warp(uint8_t dest)
 {
-    mv_mode = MV_SECTOR;
+    map_dest_sector = dest;
+    galaxy_step_turn();
+    sfx_player(SFX_LAUNCH, SFX_PRI_EVENT);
+    if (galaxy_roll_encounter(dest)) {
+        return MAP_GO_SPACE;
+    }
+    g_voy.sector = dest;
+    galaxy_visit(dest);
+    save_write(g_save_slot);
+    chart_cx = g_gx.cell[dest] & 0x0Fu;
+    chart_cy = g_gx.cell[dest] >> 4;
+    build_sector_items();
+    if (mv_mode == MV_CHART) {
+        draw_star_chart();
+    } else {
+        video_set_mode(VID_MODE_MENU, 0);
+        draw_sector_view();
+    }
+    return MAP_STAY;
+}
+
+void map_enter_tab(uint8_t tab)
+{
+    mv_mode = tab;
+    mv_confirm_exit = false;
     galaxy_visit(g_voy.sector);
     chart_cx = g_gx.cell[g_voy.sector] & 0x0Fu;
     chart_cy = g_gx.cell[g_voy.sector] >> 4;
     build_sector_items();
-    video_set_mode(VID_MODE_MENU, 0);
-    draw_sector_view();
+    if (tab == MV_CHART) {
+        draw_star_chart();
+    } else if (tab == MV_CLOSEUP) {
+        draw_closeup_chart();
+    } else {
+        mv_mode = MV_SECTOR;
+        video_set_mode(VID_MODE_MENU, 0);
+        draw_sector_view();
+    }
     music_play("ROM:Map.vgm");
+}
+
+void map_enter(void)
+{
+    map_enter_tab(MV_SECTOR);
 }
 
 map_action_t map_update(void)
@@ -712,6 +780,19 @@ map_action_t map_update(void)
     video_twinkle_stars(g_frame);
 
     if (mv_mode == MV_SECTOR) {
+        if (mv_confirm_exit) {
+            if (in_pressed & IN_A) {
+                mv_confirm_exit = false;
+                save_write(g_save_slot);
+                sfx_player(SFX_BLIP, SFX_PRI_LOW);
+                return MAP_GO_TITLE;
+            } else if (in_pressed & (IN_B | IN_START)) {
+                mv_confirm_exit = false;
+                sfx_player(SFX_BLIP, SFX_PRI_LOW);
+                draw_sector_footer();
+            }
+            return MAP_STAY;
+        }
         if (in_pressed & IN_UP) {
             uint8_t old = mv_sel;
             mv_sel = (mv_sel == 0) ? (uint8_t)(mv_nitems - 1) : (uint8_t)(mv_sel - 1);
@@ -724,16 +805,20 @@ map_action_t map_update(void)
             sfx_player(SFX_BLIP, SFX_PRI_LOW);
             draw_sector_item(old);
             draw_sector_item(mv_sel);
-        } else if (in_pressed & IN_BTN2) {
+        } else if (in_pressed & IN_R1) {
             mv_mode = MV_CHART;
             g_pending_ach = 0xFFu;
             sfx_player(SFX_BLIP, SFX_PRI_LOW);
             draw_star_chart();
-        } else if (in_pressed & IN_START) {
-            save_write(g_save_slot);
+        } else if (in_pressed & IN_L1) {
+            g_pending_ach = 0xFFu;
             sfx_player(SFX_BLIP, SFX_PRI_LOW);
-            return MAP_GO_TITLE;
-        } else if (in_pressed & IN_FIRE) {
+            return MAP_GO_ACHIEVE;
+        } else if (in_pressed & (IN_B | IN_START)) {
+            mv_confirm_exit = true;
+            sfx_player(SFX_BLIP, SFX_PRI_LOW);
+            draw_sector_footer();
+        } else if (in_pressed & IN_A) {
             g_pending_ach = 0xFFu;
             uint8_t it = mv_items[mv_sel];
             if (it == 0x81) {
@@ -748,20 +833,7 @@ map_action_t map_update(void)
                     sfx_player(SFX_DENY, SFX_PRI_LOW);
                 }
             } else {
-                /* Warp to sector it */
-                map_dest_sector = it;
-                galaxy_step_turn();
-                sfx_player(SFX_LAUNCH, SFX_PRI_EVENT);
-                if (galaxy_roll_encounter(it)) {
-                    return MAP_GO_SPACE;
-                }
-                g_voy.sector = it;
-                galaxy_visit(it);
-                save_write(g_save_slot);
-                chart_cx = g_gx.cell[it] & 0x0Fu;
-                chart_cy = g_gx.cell[it] >> 4;
-                build_sector_items();
-                draw_sector_view();
+                return perform_warp(it);
             }
         }
     } else if (mv_mode == MV_CHART) {
@@ -775,21 +847,37 @@ map_action_t map_update(void)
             draw_chart_cursor(ox, oy, false);
             draw_chart_cursor(chart_cx, chart_cy, true);
             draw_chart_inspect();
-        } else if (in_pressed & IN_BTN2) {
+        } else if (in_pressed & IN_A) {
+            int8_t hs = sector_at_cell(chart_cx, chart_cy);
+            if (hs >= 0 && (uint8_t)hs == g_voy.sector) {
+                mv_mode = MV_SECTOR;
+                sfx_player(SFX_BLIP, SFX_PRI_LOW);
+                video_set_mode(VID_MODE_MENU, 0);
+                draw_sector_view();
+            } else if (hs >= 0 && is_reachable_neighbor((uint8_t)hs)) {
+                return perform_warp((uint8_t)hs);
+            } else {
+                sfx_player(SFX_DENY, SFX_PRI_LOW);
+            }
+        } else if (in_pressed & IN_R1) {
             mv_mode = MV_CLOSEUP;
             sfx_player(SFX_BLIP, SFX_PRI_LOW);
             draw_closeup_chart();
-        } else if (in_pressed & (IN_FIRE | IN_START)) {
+        } else if (in_pressed & (IN_L1 | IN_B)) {
             mv_mode = MV_SECTOR;
             sfx_player(SFX_BLIP, SFX_PRI_LOW);
             video_set_mode(VID_MODE_MENU, 0);
             draw_sector_view();
         }
     } else if (mv_mode == MV_CLOSEUP) {
-        if (in_pressed & IN_BTN2) {
+        if (in_pressed & IN_R1) {
             sfx_player(SFX_BLIP, SFX_PRI_LOW);
             return MAP_GO_ACHIEVE;
-        } else if (in_pressed & (IN_FIRE | IN_START)) {
+        } else if (in_pressed & IN_L1) {
+            mv_mode = MV_CHART;
+            sfx_player(SFX_BLIP, SFX_PRI_LOW);
+            draw_star_chart();
+        } else if (in_pressed & IN_B) {
             mv_mode = MV_SECTOR;
             sfx_player(SFX_BLIP, SFX_PRI_LOW);
             video_set_mode(VID_MODE_MENU, 0);

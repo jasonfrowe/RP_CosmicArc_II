@@ -14,7 +14,7 @@ static uint8_t pt_sel = 0;
 static uint8_t pt_pidx = 0;
 static uint8_t pt_tier = 0;
 static uint8_t pt_cls = 0;
-static char    pt_msg[38];
+static const char *pt_msg = NULL;
 
 static const char *const COMM_NAMES[3] = { "FUEL ORE", "ORGANICS", "EQUIPMENT" };
 static const uint16_t    COMM_BASE[3]  = { 20, 30, 50 };
@@ -61,8 +61,7 @@ static uint8_t tab_lines(void)
 
 static void set_msg(const char *m)
 {
-    strncpy(pt_msg, m, sizeof(pt_msg) - 1);
-    pt_msg[sizeof(pt_msg) - 1] = '\0';
+    pt_msg = m;
 }
 
 static void port_draw_row(uint8_t idx)
@@ -72,7 +71,7 @@ static void port_draw_row(uint8_t idx)
     uint8_t bg = sel ? C_FRAME : C_PANEL;
 
     if (idx == lidx) {
-        txt_str(1, 19, "                                      ", C_WHITE, bg);
+        txt_fill(1, 19, 38, bg);
         txt_str(1, 19, sel ? ">" : " ", C_GOLD, bg);
         txt_str(2, 19, "LEAVE STARPORT", C_ORANGE, bg);
         return;
@@ -85,7 +84,7 @@ static void port_draw_row(uint8_t idx)
         uint8_t st = g_voy.port_stock[pt_pidx][c];
         uint8_t avail = sells ? st : (uint8_t)(PT_FULL - st);
         uint16_t pr = comm_price(c);
-        txt_str(1, r, "                                      ", C_WHITE, bg);
+        txt_fill(1, r, 38, bg);
         txt_str(1, r, sel ? ">" : " ", C_GOLD, bg);
         txt_str(2, r, COMM_NAMES[c], C_WHITE, bg);
         txt_str(13, r, sells ? "BUY " : "SELL", sells ? C_GREEN : C_GOLD, bg);
@@ -96,7 +95,7 @@ static void port_draw_row(uint8_t idx)
     } else if (pt_tab == 1) {
         uint8_t i = idx;
         uint8_t r = (uint8_t)(8 + i);
-        txt_str(1, r, "                                      ", C_WHITE, bg);
+        txt_fill(1, r, 38, bg);
         txt_str(1, r, sel ? ">" : " ", C_GOLD, bg);
         txt_str(2, r, SPECIES_NAMES[i], C_WHITE, bg);
         txt_num(13, r, g_voy.stasis[i], 2, g_voy.stasis[i] ? C_GREEN : C_DIM, bg);
@@ -111,7 +110,7 @@ static void port_draw_row(uint8_t idx)
         uint16_t ecost = (uint16_t)need * EN_PRICE[pt_tier];
         uint16_t hcost = (uint16_t)(1000u + (uint16_t)g_voy.u_hull * 200u);
         uint16_t ccost = (g_voy.u_holds == 0) ? 3000u : 6000u;
-        txt_str(1, r, "                                      ", C_WHITE, bg);
+        txt_fill(1, r, 38, bg);
         txt_str(1, r, sel ? ">" : " ", C_GOLD, bg);
         if (i == 0) {
             txt_str(2, r, "RECHARGE ENERGY", C_GREEN, bg);
@@ -131,7 +130,7 @@ static void port_draw_row(uint8_t idx)
             "DEPOSIT $100", "DEPOSIT ALL", "WITHDRAW $100", "WITHDRAW ALL"
         };
         uint8_t r = (uint8_t)(10 + idx);
-        txt_str(1, r, "                                      ", C_WHITE, bg);
+        txt_fill(1, r, 38, bg);
         txt_str(1, r, sel ? ">" : " ", C_GOLD, bg);
         txt_str(2, r, blbl[idx], C_WHITE, bg);
     }
@@ -147,13 +146,13 @@ static void port_draw(void)
     txt_num(29, 1, g_voy.credits, 6, C_WHITE, C_PANEL);
 
     /* Tabs */
-    static const char *const tnames[4] = { "TRADE", "BOUNTY", "YARD", "BANK" };
+    static const char *const tnames[4] = { "TRADE", "BIO", "YARD", "BANK" };
+    static const uint8_t tx[4] = { 6, 13, 19, 26 };
+    txt_str(1, 2, "[L1]", C_CYAN, C_PANEL);
+    txt_str(35, 2, "[R1]", C_CYAN, C_PANEL);
     for (uint8_t i = 0; i < pt_ntabs; i++) {
-        uint8_t tx = (uint8_t)(2 + i * 9);
         bool act = (i == pt_tab);
-        txt_str(tx, 2, act ? "[" : " ", C_GOLD, C_PANEL);
-        txt_str(tx + 1, 2, tnames[i], act ? C_WHITE : C_DIM, act ? C_FRAME : C_PANEL);
-        txt_str(tx + 1 + (uint8_t)strlen(tnames[i]), 2, act ? "]" : " ", C_GOLD, C_PANEL);
+        txt_str(tx[i], 2, tnames[i], act ? C_GOLD : C_GREY, act ? C_FRAME : C_PANEL);
     }
 
     txt_box(0, 5, 40, 16, C_FRAME, C_PANEL);
@@ -169,7 +168,7 @@ static void port_draw(void)
         }
     } else if (pt_tab == 1) {
         txt_str(2, 6, "SPECIES   STASIS  KEPT  BOUNTY", C_CYAN, C_PANEL);
-        txt_str(2, 16, "[Z] SELL 1   [LEFT] KEEP FOR MANIFEST", C_GREY, C_PANEL);
+        txt_str(2, 16, "[A] SELL 1     [X] KEEP FOR MANIFEST", C_GREY, C_PANEL);
     } else if (pt_tab == 2) {
         txt_str(2, 16, "HULL: ", C_GREY, C_PANEL);
         txt_num(8, 16, g_voy.energy, 3, C_GREEN, C_PANEL);
@@ -191,12 +190,15 @@ static void port_draw(void)
 
     /* Status / Message box */
     txt_box(0, 22, 40, 5, C_CYAN, C_PANEL);
-    if (pt_msg[0])
+    if (pt_msg)
         txt_str(2, 24, pt_msg, C_GOLD, C_PANEL);
     else
         txt_str(2, 24, "GAME AUTO-SAVED ON DOCKING", C_GREEN, C_PANEL);
 
-    txt_center(29, "[Z] ACT   [X] NEXT TAB   [ESC] LEAVE", C_DIM, C_TRANS);
+    if (pt_tab == 1)
+        txt_center(29, "A:SELL  X:KEEP  B:UNDOCK  L1/R1:TABS", C_DIM, C_TRANS);
+    else
+        txt_center(29, "A:ACT   B:UNDOCK   L1/R1/LR:TABS", C_DIM, C_TRANS);
 }
 
 void port_enter(void)
@@ -208,7 +210,7 @@ void port_enter(void)
     pt_ntabs = (pt_tier == TIER_SAFE) ? 4 : 3;
     pt_tab = 0;
     pt_sel = 0;
-    pt_msg[0] = '\0';
+    pt_msg = NULL;
 
     /* Deliver Relic automatically if aboard! */
     if (g_voy.relic_state == 1) {
@@ -244,17 +246,23 @@ bool port_update(void)
         sfx_player(SFX_BLIP, SFX_PRI_LOW);
         port_draw_row(old);
         port_draw_row(pt_sel);
-    } else if (in_pressed & IN_BTN2) {
+    } else if (in_pressed & (IN_R1 | IN_RIGHT)) {
         pt_tab = (uint8_t)((pt_tab + 1) % pt_ntabs);
         pt_sel = 0;
-        pt_msg[0] = '\0';
+        pt_msg = NULL;
         sfx_player(SFX_BLIP, SFX_PRI_LOW);
         port_draw();
-    } else if (in_pressed & IN_START) {
+    } else if (in_pressed & (IN_L1 | IN_LEFT)) {
+        pt_tab = (pt_tab == 0) ? (uint8_t)(pt_ntabs - 1) : (uint8_t)(pt_tab - 1);
+        pt_sel = 0;
+        pt_msg = NULL;
+        sfx_player(SFX_BLIP, SFX_PRI_LOW);
+        port_draw();
+    } else if (in_pressed & IN_B) {
         save_write(g_save_slot);
         sfx_player(SFX_LAUNCH, SFX_PRI_EVENT);
         return true;
-    } else if (pt_tab == 1 && (in_pressed & IN_LEFT) && pt_sel < NUM_SPECIES) {
+    } else if (pt_tab == 1 && (in_pressed & IN_X) && pt_sel < NUM_SPECIES) {
         /* Keep 1 specimen for manifest */
         if (g_voy.stasis[pt_sel] == 0) {
             set_msg("NONE IN STASIS");
@@ -271,7 +279,7 @@ bool port_update(void)
             sfx_player(SFX_TRADE, SFX_PRI_EVENT);
         }
         port_draw();
-    } else if (in_pressed & IN_FIRE) {
+    } else if (in_pressed & IN_A) {
         if (pt_sel == n - 1) {
             save_write(g_save_slot);
             sfx_player(SFX_LAUNCH, SFX_PRI_EVENT);

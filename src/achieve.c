@@ -1,4 +1,5 @@
 #include "achieve.h"
+#include "galaxy.h"
 #include "game.h"
 #include "input.h"
 #include "sfx.h"
@@ -61,7 +62,7 @@ static void achieve_draw_card(uint8_t i)
 static void achieve_draw_desc(void)
 {
     for (uint8_t r = 22; r <= 26; r++)
-        txt_str(1, r, "                                      ", C_WHITE, C_PANEL);
+        txt_fill(1, r, 38, C_PANEL);
 
     bool has = (g_voy.ach_bits & (uint16_t)(1u << ac_sel)) != 0;
     txt_str(2, 22, ACH_NAMES[ac_sel], C_GOLD, C_PANEL);
@@ -98,22 +99,21 @@ static void achieve_draw_desc(void)
 static void achieve_draw(void)
 {
     txt_clear(C_TRANS);
-    txt_box(0, 0, 40, 3, C_CYAN, C_PANEL);
-    txt_center(1, "A C H I E V E M E N T S", C_GOLD, C_PANEL);
+    galaxy_draw_tabs(3);
 
     uint8_t earned_cnt = 0;
     for (uint8_t i = 0; i < ACH_COUNT; i++) {
         if (g_voy.ach_bits & (uint16_t)(1u << i)) earned_cnt++;
     }
-    txt_num(33, 1, earned_cnt, 2, C_GREEN, C_PANEL);
-    txt_str(35, 1, "/16", C_GREY, C_PANEL);
-
     for (uint8_t i = 0; i < ACH_COUNT; i++)
         achieve_draw_card(i);
 
     txt_box(0, 21, 40, 7, C_CYAN, C_PANEL);
+    txt_str(26, 21, " EARNED ", C_GREY, C_PANEL);
+    txt_num(34, 21, earned_cnt, 2, C_GREEN, C_PANEL);
+    txt_str(36, 21, "/16", C_GREY, C_PANEL);
     achieve_draw_desc();
-    txt_center(29, "ARROWS: SELECT    [Z]/[X]: BACK TO MAP", C_DIM, C_TRANS);
+    txt_center(29, "D-PAD:SELECT   B:BACK   L1/R1:PAGES", C_DIM, C_TRANS);
 }
 
 void achieve_enter(void)
@@ -123,7 +123,7 @@ void achieve_enter(void)
     achieve_draw();
 }
 
-bool achieve_update(void)
+ach_action_t achieve_update(void)
 {
     video_twinkle_stars(g_frame);
     uint8_t old = ac_sel;
@@ -139,9 +139,17 @@ bool achieve_update(void)
         achieve_draw_card(ac_sel);
         achieve_draw_desc();
     }
-    if (in_pressed & (IN_FIRE | IN_BTN2 | IN_START)) {
+    if (in_pressed & IN_L1) {
         sfx_player(SFX_BLIP, SFX_PRI_LOW);
-        return true;
+        return ACH_PREV;
     }
-    return false;
+    if (in_pressed & IN_R1) {
+        sfx_player(SFX_BLIP, SFX_PRI_LOW);
+        return ACH_NEXT;
+    }
+    if (in_pressed & IN_B) {
+        sfx_player(SFX_BLIP, SFX_PRI_LOW);
+        return ACH_BACK;
+    }
+    return ACH_STAY;
 }

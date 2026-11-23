@@ -27,7 +27,9 @@ bool    galaxy_roll_encounter(uint8_t sec);
 void    galaxy_visit(uint8_t sec);
 void    galaxy_step_turn(void);
 
+void         galaxy_draw_tabs(uint8_t active);
 void         map_enter(void);
+void         map_enter_tab(uint8_t tab); /* 0=Sector, 1=Chart, 2=Close-Up */
 map_action_t map_update(void);
 
 #endif /* GALAXY_H */

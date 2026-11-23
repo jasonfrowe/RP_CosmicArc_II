@@ -8,12 +8,7 @@
 
 mode5_csprite_t spr[SPR_TOTAL_COUNT];
 
-static mode1_4bpp_data_t hud_top_buf[HUD_TOP_ROWS][TXT_COLS];
-static mode1_4bpp_data_t hud_bot_buf[HUD_BOT_ROWS][TXT_COLS];
-static uint8_t hud_top_bg[HUD_TOP_ROWS][TXT_COLS];
-static uint8_t hud_bot_bg[HUD_BOT_ROWS][TXT_COLS];
-
-static bool hud_top_dirty, hud_bot_dirty, spr_dirty;
+static bool spr_dirty;
 static uint8_t msg_timer;
 static mode2_config_t bg0_cfg, bg1_cfg, hud_top_bg_cfg, hud_bot_bg_cfg;
 static bool scroll_dirty;
@@ -40,10 +35,12 @@ static void write_mode1_cfg(uint16_t addr, int16_t y, int16_t w, int16_t h, uint
     xram0_write(addr, &cfg, sizeof(cfg));
 }
 
+static mode1_4bpp_data_t txt_row_tmp[TXT_COLS];
+
 static void init_starfield_map(void)
 {
     /* Deterministic pleasing starfield across 40x30 tiles */
-    uint8_t row[SPACE_MAP_COLS];
+    uint8_t *row = (uint8_t *)txt_row_tmp;
     uint16_t s = 0x5A3Cu;
     for (uint8_t r = 0; r < SPACE_MAP_ROWS; r++) {
         for (uint8_t c = 0; c < SPACE_MAP_COLS; c++) {
@@ -260,16 +257,6 @@ void video_commit(void)
                     &bg1_cfg.x_pos_px, 2);
         scroll_dirty = false;
     }
-    if (hud_top_dirty) {
-        xram0_write(XRAM_MAP_HUD_TOP, hud_top_bg, sizeof(hud_top_bg));
-        xram0_write(XRAM_HUD_TOP, hud_top_buf, sizeof(hud_top_buf));
-        hud_top_dirty = false;
-    }
-    if (hud_bot_dirty) {
-        xram0_write(XRAM_MAP_HUD_BOT, hud_bot_bg, sizeof(hud_bot_bg));
-        xram0_write(XRAM_HUD_BOT, hud_bot_buf, sizeof(hud_bot_buf));
-        hud_bot_dirty = false;
-    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -333,7 +320,14 @@ static void fmt_u32(char *buf, uint32_t val, uint8_t width)
 /* Fullscreen 40x30 text (VID_MODE_MENU) - direct incremental XRAM    */
 /* ------------------------------------------------------------------ */
 
-static mode1_4bpp_data_t txt_row_tmp[TXT_COLS];
+void txt_fill(uint8_t col, uint8_t row, uint8_t w, uint8_t bg)
+{
+    if (row >= TXT_ROWS || col >= TXT_COLS) return;
+    if ((uint8_t)(col + w) > TXT_COLS) w = (uint8_t)(TXT_COLS - col);
+    for (uint8_t i = 0; i < w; i++)
+        put_cell(&txt_row_tmp[i], ' ', C_WHITE, bg);
+    xram0_write((uint16_t)(XRAM_TXT + ((uint16_t)row * TXT_COLS + col) * 2u), txt_row_tmp, (uint16_t)w * 2u);
+}
 
 void txt_clear(uint8_t bg)
 {
@@ -400,127 +394,107 @@ void txt_box(uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t fg, uint8_t bg)
 }
 
 /* ------------------------------------------------------------------ */
-/* HUD Top / Bottom (4bpp Tile Panel + Transparent Mode 1 Overlay)    */
+/* HUD Top / Bottom (Direct XRAM 4bpp Tile Panel + Mode 1 Overlay)    */
 /* ------------------------------------------------------------------ */
 
-void hud_top_clear(void)
+static void __attribute__((noinline)) hud_clear_ex(uint8_t is_bot)
 {
-    for (uint8_t c = 0; c < TXT_COLS; c++) {
-        hud_top_bg[0][c] = HT_PANEL;
-        hud_top_bg[1][c] = HT_TOP_RIM;
-        put_cell(&hud_top_buf[0][c], ' ', C_WHITE, C_TRANS);
-        put_cell(&hud_top_buf[1][c], ' ', C_WHITE, C_TRANS);
+    uint16_t map_base = is_bot ? XRAM_MAP_HUD_BOT : XRAM_MAP_HUD_TOP;
+    uint16_t txt_base = is_bot ? XRAM_HUD_BOT : XRAM_HUD_TOP;
+    uint8_t *row = (uint8_t *)txt_row_tmp;
+    memset(row, is_bot ? HT_BOT_RIM : HT_PANEL, TXT_COLS);
+    xram0_write(map_base, row, TXT_COLS);
+    memset(row, is_bot ? HT_PANEL : HT_TOP_RIM, TXT_COLS);
+    xram0_write((uint16_t)(map_base + TXT_COLS), row, TXT_COLS);
+    for (uint8_t c = 0; c < TXT_COLS; c++)
+        put_cell(&txt_row_tmp[c], ' ', C_WHITE, C_TRANS);
+    xram0_write(txt_base, txt_row_tmp, sizeof(txt_row_tmp));
+    xram0_write((uint16_t)(txt_base + TXT_COLS * 2u), txt_row_tmp, sizeof(txt_row_tmp));
+}
+
+static void __attribute__((noinline)) hud_tile_ex(uint8_t is_bot, uint8_t col, uint8_t row, uint8_t tile)
+{
+    uint16_t map_base = is_bot ? XRAM_MAP_HUD_BOT : XRAM_MAP_HUD_TOP;
+    if (col < TXT_COLS && row < 2u)
+        xram0_poke8((uint16_t)(map_base + (uint16_t)row * TXT_COLS + col), tile);
+}
+
+static void __attribute__((noinline)) hud_put_ex(uint8_t is_bot, uint8_t col, uint8_t row, uint8_t ch, uint8_t fg, uint8_t bg)
+{
+    uint16_t txt_base = is_bot ? XRAM_HUD_BOT : XRAM_HUD_TOP;
+    if (col < TXT_COLS && row < 2u) {
+        mode1_4bpp_data_t cell;
+        put_cell(&cell, ch, fg, bg);
+        xram0_write((uint16_t)(txt_base + ((uint16_t)row * TXT_COLS + col) * 2u), &cell, 2);
     }
-    hud_top_dirty = true;
 }
 
-void hud_top_tile(uint8_t col, uint8_t row, uint8_t tile)
+static void __attribute__((noinline)) hud_str_ex(uint8_t is_bot, uint8_t col, uint8_t row, const char *s, uint8_t fg)
 {
-    if (col < TXT_COLS && row < HUD_TOP_ROWS) {
-        hud_top_bg[row][col] = tile;
-        hud_top_dirty = true;
-    }
+    uint16_t txt_base = is_bot ? XRAM_HUD_BOT : XRAM_HUD_TOP;
+    if (row >= 2u || col >= TXT_COLS) return;
+    uint8_t n = 0;
+    while (*s && (uint8_t)(col + n) < TXT_COLS)
+        put_cell(&txt_row_tmp[n++], (uint8_t)*s++, fg, C_TRANS);
+    if (n)
+        xram0_write((uint16_t)(txt_base + ((uint16_t)row * TXT_COLS + col) * 2u), txt_row_tmp, (uint16_t)n * 2u);
 }
 
-void hud_top_put(uint8_t col, uint8_t row, uint8_t ch, uint8_t fg, uint8_t bg)
+static void __attribute__((noinline)) hud_bar_ex(uint8_t is_bot, uint8_t col, uint8_t row, uint8_t cells,
+                       uint8_t val, uint8_t maxv, bool is_cyan)
 {
-    if (col < TXT_COLS && row < HUD_TOP_ROWS) {
-        put_cell(&hud_top_buf[row][col], ch, fg, bg);
-        hud_top_dirty = true;
-    }
-}
-
-void hud_top_str(uint8_t col, uint8_t row, const char *s, uint8_t fg)
-{
-    if (row >= HUD_TOP_ROWS) return;
-    while (*s && col < TXT_COLS)
-        put_cell(&hud_top_buf[row][col++], (uint8_t)*s++, fg, C_TRANS);
-    hud_top_dirty = true;
-}
-
-void hud_top_num(uint8_t col, uint8_t row, uint32_t val, uint8_t width, uint8_t fg)
-{
-    char buf[12];
-    fmt_u32(buf, val, width);
-    hud_top_str(col, row, buf, fg);
-}
-
-static void draw_tile_bar(uint8_t *bg_row, uint8_t col, uint8_t cells,
-                          uint8_t val, uint8_t maxv, bool is_cyan)
-{
+    uint16_t map_base = is_bot ? XRAM_MAP_HUD_BOT : XRAM_MAP_HUD_TOP;
+    if (row >= 2u || col >= TXT_COLS) return;
     if (maxv == 0) maxv = 1;
     uint16_t steps = (uint16_t)val * cells * 4u / maxv;
     uint8_t base = is_cyan ? HT_BAR_CYAN :
                    (((uint16_t)val * 4u <= maxv) ? HT_BAR_RED :
                    (((uint16_t)val * 2u <= maxv) ? HT_BAR_GOLD : HT_BAR_GREEN));
-    for (uint8_t i = 0; i < cells && (col + i) < TXT_COLS; i++) {
+    uint8_t *tiles = (uint8_t *)txt_row_tmp;
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < cells && (uint8_t)(col + i) < TXT_COLS; i++) {
         if (steps >= 4) {
-            bg_row[col + i] = (uint8_t)(base + 3u);
+            tiles[n++] = (uint8_t)(base + 3u);
             steps -= 4;
         } else if (steps > 0) {
-            bg_row[col + i] = (uint8_t)(base + steps - 1u);
+            tiles[n++] = (uint8_t)(base + steps - 1u);
             steps = 0;
         } else {
-            bg_row[col + i] = HT_BAR_EMPTY;
+            tiles[n++] = HT_BAR_EMPTY;
         }
     }
+    if (n)
+        xram0_write((uint16_t)(map_base + (uint16_t)row * TXT_COLS + col), tiles, n);
 }
 
+void hud_top_clear(void) { hud_clear_ex(0); }
+void hud_top_tile(uint8_t col, uint8_t row, uint8_t tile) { hud_tile_ex(0, col, row, tile); }
+void hud_top_put(uint8_t col, uint8_t row, uint8_t ch, uint8_t fg, uint8_t bg) { hud_put_ex(0, col, row, ch, fg, bg); }
+void hud_top_str(uint8_t col, uint8_t row, const char *s, uint8_t fg) { hud_str_ex(0, col, row, s, fg); }
+void hud_top_num(uint8_t col, uint8_t row, uint32_t val, uint8_t width, uint8_t fg)
+{
+    char buf[12];
+    fmt_u32(buf, val, width);
+    hud_str_ex(0, col, row, buf, fg);
+}
 void hud_top_bar(uint8_t col, uint8_t row, uint8_t cells, uint8_t val, uint8_t maxv, bool is_cyan)
 {
-    if (row < HUD_TOP_ROWS) {
-        draw_tile_bar(hud_top_bg[row], col, cells, val, maxv, is_cyan);
-        hud_top_dirty = true;
-    }
+    hud_bar_ex(0, col, row, cells, val, maxv, is_cyan);
 }
 
-void hud_bot_clear(void)
-{
-    for (uint8_t c = 0; c < TXT_COLS; c++) {
-        hud_bot_bg[0][c] = HT_BOT_RIM;
-        hud_bot_bg[1][c] = HT_PANEL;
-        put_cell(&hud_bot_buf[0][c], ' ', C_WHITE, C_TRANS);
-        put_cell(&hud_bot_buf[1][c], ' ', C_WHITE, C_TRANS);
-    }
-    hud_bot_dirty = true;
-}
-
-void hud_bot_tile(uint8_t col, uint8_t row, uint8_t tile)
-{
-    if (col < TXT_COLS && row < HUD_BOT_ROWS) {
-        hud_bot_bg[row][col] = tile;
-        hud_bot_dirty = true;
-    }
-}
-
-void hud_bot_put(uint8_t col, uint8_t row, uint8_t ch, uint8_t fg, uint8_t bg)
-{
-    if (col < TXT_COLS && row < HUD_BOT_ROWS) {
-        put_cell(&hud_bot_buf[row][col], ch, fg, bg);
-        hud_bot_dirty = true;
-    }
-}
-
-void hud_bot_str(uint8_t col, uint8_t row, const char *s, uint8_t fg)
-{
-    if (row >= HUD_BOT_ROWS) return;
-    while (*s && col < TXT_COLS)
-        put_cell(&hud_bot_buf[row][col++], (uint8_t)*s++, fg, C_TRANS);
-    hud_bot_dirty = true;
-}
-
+void hud_bot_clear(void) { hud_clear_ex(1); }
+void hud_bot_tile(uint8_t col, uint8_t row, uint8_t tile) { hud_tile_ex(1, col, row, tile); }
+void hud_bot_put(uint8_t col, uint8_t row, uint8_t ch, uint8_t fg, uint8_t bg) { hud_put_ex(1, col, row, ch, fg, bg); }
+void hud_bot_str(uint8_t col, uint8_t row, const char *s, uint8_t fg) { hud_str_ex(1, col, row, s, fg); }
 void hud_bot_bar(uint8_t col, uint8_t row, uint8_t cells, uint8_t val, uint8_t maxv, bool is_cyan)
 {
-    if (row < HUD_BOT_ROWS) {
-        draw_tile_bar(hud_bot_bg[row], col, cells, val, maxv, is_cyan);
-        hud_bot_dirty = true;
-    }
+    hud_bar_ex(1, col, row, cells, val, maxv, is_cyan);
 }
 
 void chart_bg_clear(void)
 {
-    uint8_t row[TXT_COLS];
-    memset(row, HT_CH_EMPTY_T, sizeof(row));
+    uint8_t *row = (uint8_t *)txt_row_tmp;
+    memset(row, HT_CH_EMPTY_T, TXT_COLS);
     for (uint8_t r = 0; r < 17; r++)
         xram0_write((uint16_t)(XRAM_MAP_PSKY + (uint16_t)r * TXT_COLS), row, TXT_COLS);
 }

@@ -59,7 +59,8 @@ rp6502_executable(RP_CosmicArc_II DATA default RESET default)
 rp6502_web(RP_CosmicArc_II)
 
 target_include_directories(RP_CosmicArc_II PRIVATE src)
-target_compile_options(RP_CosmicArc_II PRIVATE -Oz -Wall -Wextra)
+target_compile_options(RP_CosmicArc_II PRIVATE -Oz -fno-unroll-loops -Wall -Wextra)
+target_link_options(RP_CosmicArc_II PRIVATE -Oz -Wl,-mllvm,-inline-threshold=0)
 
 target_sources(RP_CosmicArc_II PRIVATE
     src/main.c
