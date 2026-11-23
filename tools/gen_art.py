@@ -114,18 +114,18 @@ PALETTES = {
     ],
     "PAL_ROCK": [
         (0, 0, 0),       # 0 transparent
-        (56, 40, 34),    # 1 deep shadow rock
-        (98, 72, 58),    # 2 dark crag
-        (148, 114, 92),  # 3 mid rock facet
-        (206, 174, 144), # 4 bright sunlit ridge
-        (34, 24, 22),    # 5 crevice / outline
+        (96, 66, 48),    # 1 shadow rock (brighter, clearly visible on black)
+        (152, 110, 76),  # 2 mid-dark crag
+        (204, 162, 118), # 3 bright tan facet
+        (248, 224, 184), # 4 sunlit cream ridge
+        (52, 34, 26),    # 5 deep crater / outline
         (255, 255, 255), # 6 boom core white
         (255, 240, 112), # 7 boom yellow
         (255, 148, 36),  # 8 boom orange
         (220, 56, 32),   # 9 boom red
         (128, 40, 32),   # A boom dark red
-        (88, 80, 96),    # B smoke grey
-        (152, 148, 164), # C mineral glint / smoke
+        (108, 100, 116), # B smoke grey
+        (172, 168, 184), # C mineral glint / smoke
         (112, 232, 255), # D laser cyan
         (255, 255, 255), # E laser core
         (255, 224, 80),  # F aim gold
@@ -352,23 +352,24 @@ def _poly_rock(size, radii, n_frames, craters):
 
 
 def make_rock_l():
-    # 20x20 craggy 10-vertex asteroid, 4 tumbling frames
-    radii = [8.6, 6.2, 9.0, 7.8, 5.8, 8.8, 7.2, 8.4, 5.6, 7.8]
-    craters = [(-2.6, -2.0, 1.9), (2.8, 2.2, 1.6), (-1.5, 3.2, 1.2)]
-    return _poly_rock(20, radii, 4, craters)
+    # 24x24 bold craggy 10-vertex asteroid, 4 tumbling frames
+    radii = [10.6, 8.0, 11.2, 9.6, 7.6, 11.0, 9.0, 10.4, 7.4, 9.8]
+    craters = [(-3.2, -2.5, 2.3), (3.4, 2.6, 2.0), (-1.8, 3.8, 1.5)]
+    return _poly_rock(24, radii, 4, craters)
 
 
 def make_rock_m():
     # 16x16 jagged 9-vertex asteroid, 4 tumbling frames
-    radii = [6.8, 4.9, 7.2, 5.4, 6.9, 4.6, 6.6, 5.8, 4.8]
-    craters = [(-1.8, -1.2, 1.4), (2.0, 1.6, 1.2)]
+    radii = [7.4, 5.6, 7.6, 6.2, 7.4, 5.4, 7.2, 6.4, 5.6]
+    craters = [(-2.0, -1.4, 1.5), (2.2, 1.8, 1.3)]
     return _poly_rock(16, radii, 4, craters)
 
 
 def make_rock_s():
-    # 8x8 sharp rocky chunk, 4 tumbling frames
-    radii = [3.4, 2.2, 3.6, 2.4, 3.3, 2.0, 3.1]
-    return _poly_rock(8, radii, 4, [])
+    # 12x12 bright sharp rocky chunk, 4 tumbling frames (clearly visible!)
+    radii = [5.2, 3.8, 5.5, 4.1, 5.2, 3.6, 4.9]
+    craters = [(-1.0, -0.8, 1.0)]
+    return _poly_rock(12, radii, 4, craters)
 
 
 def make_saucer():
@@ -397,68 +398,68 @@ def make_saucer():
 
 
 def make_raiders():
-    """16x16 alien crescent viper raider: 3 base orientations (R, U, UR) -> 8-way via HFLIP/VFLIP."""
-    # Frame 0: Pointing RIGHT (nose at x=14..15, thrusters at x=0..2)
-    r_right = parse_frame("""
-    ................
-    ...122..........
-    ....12332.......
-    .....123332.....
-    ..56..1223332...
-    .9856512FF3343..
-    98D5672FFF33443.
-    98D5672FFF334443
-    98D5672FFF33443.
-    .9856512FF3343..
-    ..56..1223332...
-    .....123332.....
-    ....12332.......
-    ...122..........
-    ................
-    ................
-    """, 16, 16)
-
-    # Frame 1: Pointing UP (nose at y=0..1, thrusters at y=13..15)
-    r_up = parse_frame("""
-    .......3........
-    ......343.......
-    .....34443......
-    ....2334332.....
-    ...233FFF332....
-    ..2332FFF2332...
-    .233212F212332..
-    .2321.121.1232..
-    .121..575..121..
-    ..1..56765..1...
-    .....56665......
-    ......8D8.......
-    ......989.......
-    .......9........
-    ................
+    """16x16 TIE-Fighter style twin-wing interceptor: 3 orientations (H, V, Diag)."""
+    # Frame 0: Horizontal travel (solar panels top & bottom, central cockpit pod + struts)
+    t_horiz = parse_frame("""
+    ..577777777775..
+    .56221111112265.
+    ..566666666665..
+    .......57.......
+    ......5676......
+    .....562365.....
+    ....562FF365....
+    ....562FD365....
+    ....562FF365....
+    .....562365.....
+    ......5676......
+    .......57.......
+    ..566666666665..
+    .56221111112265.
+    ..577777777775..
     ................
     """, 16, 16)
 
-    # Frame 2: Pointing UP-RIGHT (nose at top-right, swept alien wings, thruster bottom-left)
-    r_ur = parse_frame("""
-    .............33.
-    ...........23443
-    .........233443.
-    ....122.233332..
-    .....1233FF32...
-    ......12FFF32...
-    .....562FF32....
-    ....5672232.....
-    ...56765121.....
-    ..8D65...122....
-    .9885.....122...
-    .99........121..
-    ............1...
+    # Frame 1: Vertical travel (solar panels left & right, central cockpit pod + struts)
+    t_vert = parse_frame("""
     ................
-    ................
+    .56..........65.
+    5625........5265
+    5725........5275
+    5715...56...5175
+    5715..5676..5175
+    5715.562365.5175
+    5716562FF3656175
+    5716562FD3656175
+    5715.562365.5175
+    5715..5676..5175
+    5715...56...5175
+    5725........5275
+    5625........5265
+    .56..........65.
     ................
     """, 16, 16)
 
-    return [r_right, r_up, r_ur]
+    # Frame 2: Diagonal travel (angled twin solar panels flanking central cockpit pod)
+    t_diag = parse_frame("""
+    ........576.....
+    .......56265....
+    ......562165....
+    .....562165.....
+    ....562165.56...
+    ....5665..5676..
+    .....55..562365.
+    ........562FF365
+    .......562FD365.
+    .56...562365.55.
+    5625...5676.5665
+    57265...56.56126
+    .561265...561265
+    ..561265.561265.
+    ...5626556265...
+    ....576..576....
+    """, 16, 16)
+
+    return [t_horiz, t_vert, t_diag]
 
 
 def make_gunships():
@@ -1262,6 +1263,101 @@ def make_hud_tiles():
     # 36: radar storm alert blip (red!)
     tiles.append(radar_tile([(3, 1, 6), (4, 1, 6), (3, 2, 6), (4, 2, 6), (3, 3, 3), (4, 3, 3), (3, 5, 6), (4, 5, 6)]))
 
+    # --- Custom 4bpp Galactic Star Chart tiles (37..48, transparent over starfield!) ---
+    # 37: transparent empty
+    tiles.append([[0] * 8 for _ in range(8)])
+    # 38: hyperlane horizontal
+    t = [[0] * 8 for _ in range(8)]
+    t[3] = [0xC] * 8; t[4] = [0xD] * 8
+    tiles.append(t)
+    # 39: hyperlane vertical
+    t = [[0] * 8 for _ in range(8)]
+    for y in range(8): t[y][3] = 0xC; t[y][4] = 0xD
+    tiles.append(t)
+    # 40: hyperlane diag down-right (\)
+    t = [[0] * 8 for _ in range(8)]
+    for i in range(8):
+        t[i][i] = 0xC
+        if i + 1 < 8: t[i][i + 1] = 0xD
+    tiles.append(t)
+    # 41: hyperlane diag down-left (/)
+    t = [[0] * 8 for _ in range(8)]
+    for i in range(8):
+        t[i][7 - i] = 0xC
+        if 6 - i >= 0: t[i][6 - i] = 0xD
+    tiles.append(t)
+    # 42: hyperlane diag cross (X)
+    t = [[0] * 8 for _ in range(8)]
+    for i in range(8):
+        t[i][i] = 0xC; t[i][7 - i] = 0xC
+    tiles.append(t)
+    # 43: chart node - Starport (cyan orbital station)
+    tiles.append(parse_frame("""
+    ...44...
+    ..4224..
+    .4C44C4.
+    42422424
+    42422424
+    .4C44C4.
+    ..4CC4..
+    ...44...
+    """, 8, 8))
+    # 44: chart node - Planet (shaded emerald globe)
+    tiles.append(parse_frame("""
+    ..5555..
+    .52555E.
+    525555EE
+    5555EEEE
+    555EEEEE
+    55EEEEE1
+    .EEEEEE.
+    ..EEEE..
+    """, 8, 8))
+    # 45: chart node - Nebula (glowing magenta cloud)
+    tiles.append(parse_frame("""
+    ..88....
+    .82888..
+    8882888.
+    .8888288
+    8828888.
+    .88888..
+    ...888..
+    ........
+    """, 8, 8))
+    # 46: chart node - Empty visited sector (steel beacon)
+    tiles.append(parse_frame("""
+    ........
+    ..AAAA..
+    .A9999A.
+    .A9229A.
+    .A9229A.
+    .A9999A.
+    ..AAAA..
+    ........
+    """, 8, 8))
+    # 47: chart node - Unvisited seen sector (dim sensor ring)
+    tiles.append(parse_frame("""
+    ........
+    ..AAAA..
+    .A....A.
+    .A.99.A.
+    .A.99.A.
+    .A....A.
+    ..AAAA..
+    ........
+    """, 8, 8))
+    # 48: chart node - The Ark (golden gleaming saucer)
+    tiles.append(parse_frame("""
+    ..2332..
+    .332233.
+    34322343
+    23333332
+    .777777.
+    ..7337..
+    ........
+    ........
+    """, 8, 8))
+
     return tiles
 
 
@@ -1271,9 +1367,9 @@ def main():
 
     sheets = [
         ("ark",          64, 32, make_ark(),         PALETTES["PAL_ARK"]),
-        ("rock_l",       20, 20, make_rock_l(),      PALETTES["PAL_ROCK"]),
+        ("rock_l",       24, 24, make_rock_l(),      PALETTES["PAL_ROCK"]),
         ("rock_m",       16, 16, make_rock_m(),      PALETTES["PAL_ROCK"]),
-        ("rock_s",        8,  8, make_rock_s(),      PALETTES["PAL_ROCK"]),
+        ("rock_s",       12, 12, make_rock_s(),      PALETTES["PAL_ROCK"]),
         ("saucer",       16, 12, make_saucer(),      PALETTES["PAL_SAUCER"]),
         ("raider",       16, 16, make_raiders(),     PALETTES["PAL_PIRATE"]),
         ("gunship",      20, 20, make_gunships(),    PALETTES["PAL_PIRATE"]),
@@ -1329,22 +1425,19 @@ def main():
         h_lines.append(f"#define {cname} {cid}u")
     h_lines.append("")
 
-    h_lines.append("#ifdef DEFINE_PALETTE_DATA")
-    h_lines.append(f"static const uint16_t game_palettes[PAL_COUNT][16] = {{")
+    pal_bin = bytearray()
     for pname in pal_names:
         cols = PALETTES[pname]
-        vals = [rgb555_a(r, g, b, opaque=(i != 0 or pname == "PAL_SPACE_BG"))
-                for i, (r, g, b) in enumerate(cols)]
-        hexes = ", ".join(f"0x{v:04X}u" for v in vals)
-        h_lines.append(f"    /* {pname} */ {{ {hexes} }},")
-    h_lines.append("};")
-    h_lines.append("#endif /* DEFINE_PALETTE_DATA */")
-    h_lines.append("")
+        for i, (r, g, b) in enumerate(cols):
+            v = rgb555_a(r, g, b, opaque=(i != 0 or pname == "PAL_SPACE_BG"))
+            pal_bin.extend(struct.pack("<H", v))
+    (IMG / "palettes.bin").write_bytes(pal_bin)
+
     h_lines.append("#endif /* GEN_ASSETS_H */")
     h_lines.append("")
 
     (GEN / "assets.h").write_text("\n".join(h_lines))
-    print(f"Generated {len(sheets)} PNG sheets and src/gen/assets.h ({len(pal_names)} palettes)")
+    print(f"Generated {len(sheets)} PNG sheets, images/palettes.bin ({len(pal_bin)}B), and src/gen/assets.h ({len(pal_names)} palettes)")
 
 
 if __name__ == "__main__":

@@ -1049,7 +1049,7 @@ static void planet_render(void)
         int16_t sy = storm_y >> 4;
         uint8_t rf = (g_frame >> 3) & 3u;
         spr_place(idx++, (uint16_t)(XRAM_IMG_ROCK_L + rf * ROCK_L_FRAME_BYTES), PAL_ROCK,
-                  MODE5_SIZE(ROCK_L_W, ROCK_L_H), MODE5_4BPP, sx - 10, sy - 10);
+                  MODE5_SIZE(ROCK_L_W, ROCK_L_H), MODE5_4BPP, sx - 12, sy - 12);
     }
     if (ark_bolt_life > 0 && idx < SPR_TOTAL_COUNT) {
         uint8_t bf = (ark_bolt_dy != 0) ? 0u : 2u;

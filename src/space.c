@@ -195,7 +195,7 @@ static const int16_t lane_sy[8] = {  22,  22, 128, 234, 234, 234, 128,  22 };
 static const uint8_t lane_scale[8] = { 16, 22, 20, 22, 16, 22, 20, 22 };
 
 static const uint8_t rock_dmg[4] = { 0, 16, 12, 8 };
-static const uint8_t rock_rad[4] = { 0, 8, 6, 4 };
+static const uint8_t rock_rad[4] = { 0, 11, 7, 5 };
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                            */
@@ -1047,13 +1047,13 @@ static void space_render(void)
         int16_t rx = FROM_FP(r->x), ry = FROM_FP(r->y);
         if (r->type == RK_L)
             spr_place(idx++, (uint16_t)(XRAM_IMG_ROCK_L + f * ROCK_L_FRAME_BYTES), PAL_ROCK,
-                      MODE5_SIZE(ROCK_L_W, ROCK_L_H), MODE5_4BPP, rx - 10, ry - 10);
+                      MODE5_SIZE(ROCK_L_W, ROCK_L_H), MODE5_4BPP, rx - 12, ry - 12);
         else if (r->type == RK_M)
             spr_place(idx++, (uint16_t)(XRAM_IMG_ROCK_M + f * ROCK_M_FRAME_BYTES), PAL_ROCK,
                       MODE5_SIZE(ROCK_M_W, ROCK_M_H), MODE5_4BPP, rx - 8, ry - 8);
         else
             spr_place(idx++, (uint16_t)(XRAM_IMG_ROCK_S + f * ROCK_S_FRAME_BYTES), PAL_ROCK,
-                      MODE5_SIZE(ROCK_S_W, ROCK_S_H), MODE5_4BPP, rx - 4, ry - 4);
+                      MODE5_SIZE(ROCK_S_W, ROCK_S_H), MODE5_4BPP, rx - 6, ry - 6);
     }
 
     /* Directional 8-way Raiders, heavy Gunships, and directional 8-way Missiles */

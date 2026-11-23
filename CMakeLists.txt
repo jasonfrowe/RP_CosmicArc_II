@@ -24,9 +24,9 @@ endfunction()
 
 # 4bpp Sprite & Tile Sheets
 arc_sheet(ark          64 32 XRAM_IMG_ARK)
-arc_sheet(rock_l       20 20 XRAM_IMG_ROCK_L)
+arc_sheet(rock_l       24 24 XRAM_IMG_ROCK_L)
 arc_sheet(rock_m       16 16 XRAM_IMG_ROCK_M)
-arc_sheet(rock_s        8  8 XRAM_IMG_ROCK_S)
+arc_sheet(rock_s       12 12 XRAM_IMG_ROCK_S)
 arc_sheet(saucer       16 12 XRAM_IMG_SAUCER)
 arc_sheet(raider       16 16 XRAM_IMG_RAIDER)
 arc_sheet(gunship      20 20 XRAM_IMG_GUNSHIP)
@@ -43,6 +43,9 @@ arc_sheet(tunnel       24 16 XRAM_IMG_TUNNEL)
 arc_sheet(tiles_space   8  8 XRAM_TILES_SPACE)
 arc_sheet(tiles_planet  8  8 XRAM_TILES_PLANET)
 arc_sheet(tiles_hud     8  8 XRAM_TILES_HUD)
+
+# 16-color palettes loaded directly into XRAM
+rp6502_asset(RP_CosmicArc_II XRAM(XRAM_PALETTES) images/palettes.bin)
 
 # OPL2 SFX Blob
 rp6502_asset(RP_CosmicArc_II XRAM(XRAM_SFX_DATA) music/sfx.bin)

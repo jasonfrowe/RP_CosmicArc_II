@@ -506,20 +506,24 @@ static void draw_sector_view(void)
 
 static void draw_chart_cursor(uint8_t cx, uint8_t cy, bool show)
 {
-    uint8_t kx = (uint8_t)(2 + cx * 3);
+    uint8_t kx = (uint8_t)(8 + cx * 2);
     uint8_t ky = (uint8_t)(4 + cy * 2);
     if (show) {
         if (kx > 0) txt_put(kx - 1, ky, '[', C_WHITE, C_TRANS);
         if (kx + 1 < TXT_COLS) txt_put(kx + 1, ky, ']', C_WHITE, C_TRANS);
     } else {
-        /* Restore horizontal warp connectors if a visited sector connects across */
-        int8_t s = sector_at_cell(cx, cy);
-        int8_t sl = (cx > 0) ? sector_at_cell((uint8_t)(cx - 1), cy) : -1;
-        bool has_l = (sl >= 0 && (g_voy.visited[sl] & 1u) && (g_gx.warp[sl] & (1u << 2)));
-        bool has_r = (s >= 0 && (g_voy.visited[s] & 1u) && (g_gx.warp[s] & (1u << 2)));
-        if (kx > 0) txt_put(kx - 1, ky, has_l ? '-' : ' ', C_DIM, C_TRANS);
-        if (kx + 1 < TXT_COLS) txt_put(kx + 1, ky, has_r ? '-' : ' ', C_DIM, C_TRANS);
+        if (kx > 0) txt_put(kx - 1, ky, ' ', C_WHITE, C_TRANS);
+        if (kx + 1 < TXT_COLS) txt_put(kx + 1, ky, ' ', C_WHITE, C_TRANS);
     }
+}
+
+static void chart_set_diag(uint8_t col, uint8_t row, uint8_t tile)
+{
+    uint8_t cur = chart_bg_get(col, row);
+    if ((cur == HT_CH_DR && tile == HT_CH_DL) || (cur == HT_CH_DL && tile == HT_CH_DR))
+        chart_bg_tile(col, row, HT_CH_X);
+    else if (cur == HT_CH_EMPTY_T)
+        chart_bg_tile(col, row, tile);
 }
 
 static void draw_chart_inspect(void)
@@ -558,55 +562,67 @@ static void draw_chart_inspect(void)
 
 static void draw_star_chart(void)
 {
+    video_set_mode(VID_MODE_CHART, 0);
+    chart_bg_clear();
     txt_clear(C_TRANS);
     txt_box(0, 0, 40, 3, C_CYAN, C_PANEL);
     txt_center(1, "GALACTIC STAR CHART (12x8)", C_GOLD, C_PANEL);
 
+    /* Draw ALL 8 hyperlane directions from every visited sector on 4bpp Plane 1 */
+    static const uint8_t d_tile[8] = {
+        HT_CH_V, HT_CH_DL, HT_CH_H, HT_CH_DR, HT_CH_V, HT_CH_DL, HT_CH_H, HT_CH_DR
+    };
     for (uint8_t s = 0; s < GX_SECTORS; s++) {
-        if (!(g_voy.visited[s] & 3u)) continue;
-        uint8_t cx = g_gx.cell[s] & 0x0Fu;
-        uint8_t cy = g_gx.cell[s] >> 4;
-        uint8_t sx = (uint8_t)(2 + cx * 3);
-        uint8_t sy = (uint8_t)(4 + cy * 2);
-
-        if (g_voy.visited[s] & 1u) {
-            if (g_gx.warp[s] & (1u << 2)) txt_put(sx + 1, sy, '-', C_DIM, C_TRANS);
-            if (g_gx.warp[s] & (1u << 2)) txt_put(sx + 2, sy, '-', C_DIM, C_TRANS);
-            if (g_gx.warp[s] & (1u << 4)) txt_put(sx, sy + 1, '|', C_DIM, C_TRANS);
-            if (g_gx.warp[s] & (1u << 3)) txt_put(sx + 1, sy + 1, '\\', C_DIM, C_TRANS);
-            if (g_gx.warp[s] & (1u << 5)) txt_put(sx - 1, sy + 1, '/', C_DIM, C_TRANS);
+        if (!(g_voy.visited[s] & 1u)) continue;
+        int8_t cx = (int8_t)(g_gx.cell[s] & 0x0Fu);
+        int8_t cy = (int8_t)(g_gx.cell[s] >> 4);
+        int8_t sx = (int8_t)(8 + cx * 2);
+        int8_t sy = (int8_t)(cy * 2);
+        uint8_t w = g_gx.warp[s];
+        for (uint8_t d = 0; d < 8; d++) {
+            if (!(w & (uint8_t)(1u << d))) continue;
+            int8_t nx = cx + gdx[d], ny = cy + gdy[d];
+            if (nx < 0 || nx >= GX_GRID_W || ny < 0 || ny >= GX_GRID_H) continue;
+            uint8_t tx = (uint8_t)(sx + gdx[d]);
+            uint8_t ty = (uint8_t)(sy + gdy[d]);
+            if (gdx[d] && gdy[d]) chart_set_diag(tx, ty, d_tile[d]);
+            else chart_bg_tile(tx, ty, d_tile[d]);
         }
     }
 
+    /* Draw 4bpp graphical sector nodes on top of hyperlanes */
     for (uint8_t s = 0; s < GX_SECTORS; s++) {
         if (!(g_voy.visited[s] & 3u)) continue;
         uint8_t cx = g_gx.cell[s] & 0x0Fu;
         uint8_t cy = g_gx.cell[s] >> 4;
-        uint8_t sx = (uint8_t)(2 + cx * 3);
-        uint8_t sy = (uint8_t)(4 + cy * 2);
+        uint8_t sx = (uint8_t)(8 + cx * 2);
+        uint8_t sy = (uint8_t)(cy * 2);
 
+        uint8_t tile;
         if (s == g_voy.sector) {
-            txt_put(sx, sy, '@', C_GOLD, C_PANEL);
+            tile = HT_CH_ARK;
         } else if (g_voy.visited[s] & 1u) {
             uint8_t t = sec_type(s);
-            uint8_t ch = (t == GT_PORT) ? 'P' : (t == GT_PLANET ? 'O' : (t == GT_NEBULA ? '#' : '+'));
-            uint8_t fg = (t == GT_PORT) ? C_CYAN : (t == GT_PLANET ? C_GREEN : (t == GT_NEBULA ? C_MAGENTA : C_GREY));
-            txt_put(sx, sy, ch, fg, C_TRANS);
+            tile = (t == GT_PORT) ? HT_CH_PORT :
+                   (t == GT_PLANET ? HT_CH_PLANET :
+                   (t == GT_NEBULA ? HT_CH_NEBULA : HT_CH_EMPTY));
         } else {
-            txt_put(sx, sy, '?', C_DIM, C_TRANS);
+            tile = HT_CH_SEEN;
         }
+        chart_bg_tile(sx, sy, tile);
     }
 
     draw_chart_cursor(chart_cx, chart_cy, true);
     txt_box(0, 21, 40, 6, C_CYAN, C_PANEL);
     draw_chart_inspect();
 
-    txt_str(2, 28, "@:ARK P:PORT O:PLANET #:NEBULA ?:SEEN", C_GREY, C_TRANS);
+    txt_center(28, "GOLD:ARK  CYAN:PORT  GRN:PLANET  MAG:NEB", C_GREY, C_TRANS);
     txt_center(29, "ARROWS: INSPECT  [X] CLOSE-UP  [Z] BACK", C_DIM, C_TRANS);
 }
 
 static void draw_closeup_chart(void)
 {
+    video_set_mode(VID_MODE_MENU, 0);
     txt_clear(C_TRANS);
     txt_box(0, 0, 40, 3, C_CYAN, C_PANEL);
     txt_center(1, "CLOSE-UP SECTOR CIRCUIT", C_GOLD, C_PANEL);
@@ -620,36 +636,40 @@ static void draw_closeup_chart(void)
     if (oy < 0) oy = 0;
     if (oy > GX_GRID_H - 5) oy = GX_GRID_H - 5;
 
+    /* Pass 1: Draw ALL 8 warp directions from every visited sector in the 5x5 window */
+    static const int8_t cz_x1[8] = {  3,  6,  6,  6,  3, -1, -1, -1 };
+    static const int8_t cz_y1[8] = { -1, -1,  1,  3,  3,  3,  1, -1 };
+    static const int8_t cz_x2[8] = {  3,  7,  7,  7,  3, -2, -2, -2 };
+    static const int8_t cz_y2[8] = { -2, -2,  1,  4,  4,  4,  1, -2 };
+    static const uint8_t cz_ch[8] = { '|', '/', '-', '\\', '|', '/', '-', '\\' };
     for (uint8_t ry = 0; ry < 5; ry++) {
         for (uint8_t rx = 0; rx < 5; rx++) {
-            uint8_t gx = (uint8_t)(ox + rx);
-            uint8_t gy = (uint8_t)(oy + ry);
-            int8_t s = sector_at_cell(gx, gy);
+            int8_t s = sector_at_cell((uint8_t)(ox + rx), (uint8_t)(oy + ry));
+            if (s < 0 || !(g_voy.visited[s] & 1u)) continue;
+            int8_t sx = (int8_t)(1 + rx * 8);
+            int8_t sy = (int8_t)(4 + ry * 5);
+            uint8_t w = g_gx.warp[s];
+            for (uint8_t d = 0; d < 8; d++) {
+                if (!(w & (uint8_t)(1u << d))) continue;
+                int8_t nrx = (int8_t)rx + gdx[d], nry = (int8_t)ry + gdy[d];
+                if (nrx < 0 || nrx >= 5 || nry < 0 || nry >= 5) continue;
+                uint8_t col = (d & 1u) ? C_TEAL : C_CYAN;
+                txt_put((uint8_t)(sx + cz_x1[d]), (uint8_t)(sy + cz_y1[d]), cz_ch[d], col, C_TRANS);
+                txt_put((uint8_t)(sx + cz_x2[d]), (uint8_t)(sy + cz_y2[d]), cz_ch[d], col, C_TRANS);
+            }
+        }
+    }
+
+    /* Pass 2: Draw sector boxes cleanly on top */
+    for (uint8_t ry = 0; ry < 5; ry++) {
+        for (uint8_t rx = 0; rx < 5; rx++) {
+            int8_t s = sector_at_cell((uint8_t)(ox + rx), (uint8_t)(oy + ry));
             if (s < 0 || !(g_voy.visited[s] & 3u)) continue;
 
             uint8_t sx = (uint8_t)(1 + rx * 8);
             uint8_t sy = (uint8_t)(4 + ry * 5);
             bool is_ark = ((uint8_t)s == g_voy.sector);
             bool vis = (g_voy.visited[s] & 1u) != 0;
-
-            /* Warp lines to E, S, SE, SW */
-            if (vis) {
-                if (rx < 4 && (g_gx.warp[s] & (1u << 2))) {
-                    txt_str(sx + 6, sy + 1, "--", C_CYAN, C_TRANS);
-                }
-                if (ry < 4 && (g_gx.warp[s] & (1u << 4))) {
-                    txt_put(sx + 3, sy + 3, '|', C_CYAN, C_TRANS);
-                    txt_put(sx + 3, sy + 4, '|', C_CYAN, C_TRANS);
-                }
-                if (rx < 4 && ry < 4 && (g_gx.warp[s] & (1u << 3))) {
-                    txt_put(sx + 6, sy + 3, '\\', C_DIM, C_TRANS);
-                    txt_put(sx + 7, sy + 4, '\\', C_DIM, C_TRANS);
-                }
-                if (rx > 0 && ry < 4 && (g_gx.warp[s] & (1u << 5))) {
-                    txt_put(sx - 1, sy + 3, '/', C_DIM, C_TRANS);
-                    txt_put(sx - 2, sy + 4, '/', C_DIM, C_TRANS);
-                }
-            }
 
             uint8_t bfg = is_ark ? C_GOLD : (vis ? C_CYAN : C_DIM);
             uint8_t bbg = is_ark ? C_FRAME : C_PANEL;
@@ -762,6 +782,7 @@ map_action_t map_update(void)
         } else if (in_pressed & (IN_FIRE | IN_START)) {
             mv_mode = MV_SECTOR;
             sfx_player(SFX_BLIP, SFX_PRI_LOW);
+            video_set_mode(VID_MODE_MENU, 0);
             draw_sector_view();
         }
     } else if (mv_mode == MV_CLOSEUP) {
@@ -771,6 +792,7 @@ map_action_t map_update(void)
         } else if (in_pressed & (IN_FIRE | IN_START)) {
             mv_mode = MV_SECTOR;
             sfx_player(SFX_BLIP, SFX_PRI_LOW);
+            video_set_mode(VID_MODE_MENU, 0);
             draw_sector_view();
         }
     }

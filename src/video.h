@@ -10,6 +10,7 @@
 typedef enum {
     VID_MODE_NONE = 0,
     VID_MODE_MENU,   /* Plane 0 starfield + Plane 1 sprites + Plane 2 40x30 text */
+    VID_MODE_CHART,  /* Plane 0 starfield + Plane 1 4bpp star chart tiles + Plane 2 40x30 text */
     VID_MODE_SPACE,  /* Plane 0 starfield + Plane 2 HUD/msg/sprites */
     VID_MODE_PLANET  /* Plane 0 sky + Plane 1 terrain + Plane 2 HUD/msg/sprites */
 } vid_mode_t;
@@ -65,6 +66,24 @@ void txt_box(uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t fg, uint8_t bg)
 #define HT_RAD_SHU    34u
 #define HT_RAD_RELIC  35u
 #define HT_RAD_STORM  36u
+
+/* Custom 4bpp Galactic Star Chart tile IDs (in tiles_hud.png) */
+#define HT_CH_EMPTY_T 37u
+#define HT_CH_H       38u
+#define HT_CH_V       39u
+#define HT_CH_DR      40u
+#define HT_CH_DL      41u
+#define HT_CH_X       42u
+#define HT_CH_PORT    43u
+#define HT_CH_PLANET  44u
+#define HT_CH_NEBULA  45u
+#define HT_CH_EMPTY   46u
+#define HT_CH_SEEN    47u
+#define HT_CH_ARK     48u
+
+void chart_bg_clear(void);
+void chart_bg_tile(uint8_t col, uint8_t row, uint8_t tile);
+uint8_t chart_bg_get(uint8_t col, uint8_t row);
 
 /* Top HUD (2 rows, y=0..15) and Bottom HUD (2 rows, y=224..239):
  * 4bpp graphical tile layer underneath + transparent Mode 1 text overlay */

@@ -1,7 +1,6 @@
 #include <rp6502.h>
 #include <string.h>
 #include "math_fixed.h"
-#define DEFINE_PALETTE_DATA
 #include "gen/assets.h"
 #include "video.h"
 
@@ -11,11 +10,10 @@ mode5_csprite_t spr[SPR_TOTAL_COUNT];
 
 static mode1_4bpp_data_t hud_top_buf[HUD_TOP_ROWS][TXT_COLS];
 static mode1_4bpp_data_t hud_bot_buf[HUD_BOT_ROWS][TXT_COLS];
-static mode1_4bpp_data_t msg_buf[MSG_ROWS][TXT_COLS];
 static uint8_t hud_top_bg[HUD_TOP_ROWS][TXT_COLS];
 static uint8_t hud_bot_bg[HUD_BOT_ROWS][TXT_COLS];
 
-static bool hud_top_dirty, hud_bot_dirty, msg_dirty, spr_dirty;
+static bool hud_top_dirty, hud_bot_dirty, spr_dirty;
 static uint8_t msg_timer;
 static mode2_config_t bg0_cfg, bg1_cfg, hud_top_bg_cfg, hud_bot_bg_cfg;
 static bool scroll_dirty;
@@ -70,8 +68,7 @@ void video_init(void)
 {
     xreg_vga_canvas(CANVAS_320X240);
 
-    /* Upload all 16-color palettes to XRAM */
-    xram0_write(XRAM_PALETTES, game_palettes, sizeof(game_palettes));
+    /* Palettes are preloaded into XRAM_PALETTES by RP6502 ROM asset loader */
 
     /* Build starfield tilemap once */
     init_starfield_map();
@@ -138,6 +135,33 @@ void video_set_mode(vid_mode_t mode, uint8_t world_idx)
 
         xreg_vga_mode2(MODE2_4BPP | MODE2_8X8, XRAM_BG0_CONFIG, 0, 0, SCREEN_H);
         xreg_vga_mode5(MODE5_CUSTOM, XRAM_SPR, SPR_TOTAL_COUNT, 1, 0, SCREEN_H);
+        xreg_vga_mode1(MODE1_4BPP | MODE1_8X8, XRAM_TXT_CONFIG, 2, 0, SCREEN_H);
+    } else if (mode == VID_MODE_CHART) {
+        bg0_cfg.x_wrap = true;
+        bg0_cfg.y_wrap = false;
+        bg0_cfg.x_pos_px = 0;
+        bg0_cfg.y_pos_px = 0;
+        bg0_cfg.width_tiles = SPACE_MAP_COLS;
+        bg0_cfg.height_tiles = SPACE_MAP_ROWS;
+        bg0_cfg.xram_data_ptr = XRAM_MAP_SPACE;
+        bg0_cfg.xram_palette_ptr = PAL_ADDR(PAL_SPACE_BG);
+        bg0_cfg.xram_tile_ptr = XRAM_TILES_SPACE;
+        xram0_write(XRAM_BG0_CONFIG, &bg0_cfg, sizeof(bg0_cfg));
+
+        /* Reuse XRAM_MAP_PSKY as 40x17 4bpp graphical Star Chart on Plane 1 (y=32..167) */
+        bg1_cfg.x_wrap = false;
+        bg1_cfg.y_wrap = false;
+        bg1_cfg.x_pos_px = 0;
+        bg1_cfg.y_pos_px = 32;
+        bg1_cfg.width_tiles = TXT_COLS;
+        bg1_cfg.height_tiles = 17;
+        bg1_cfg.xram_data_ptr = XRAM_MAP_PSKY;
+        bg1_cfg.xram_palette_ptr = PAL_ADDR(PAL_HUD);
+        bg1_cfg.xram_tile_ptr = XRAM_TILES_HUD;
+        xram0_write(XRAM_BG1_CONFIG, &bg1_cfg, sizeof(bg1_cfg));
+
+        xreg_vga_mode2(MODE2_4BPP | MODE2_8X8, XRAM_BG0_CONFIG, 0, 0, SCREEN_H);
+        xreg_vga_mode2(MODE2_4BPP | MODE2_8X8, XRAM_BG1_CONFIG, 1, 32, 168);
         xreg_vga_mode1(MODE1_4BPP | MODE1_8X8, XRAM_TXT_CONFIG, 2, 0, SCREEN_H);
     } else if (mode == VID_MODE_SPACE) {
         bg0_cfg.x_wrap = true;
@@ -245,10 +269,6 @@ void video_commit(void)
         xram0_write(XRAM_MAP_HUD_BOT, hud_bot_bg, sizeof(hud_bot_bg));
         xram0_write(XRAM_HUD_BOT, hud_bot_buf, sizeof(hud_bot_buf));
         hud_bot_dirty = false;
-    }
-    if (msg_dirty) {
-        xram0_write(XRAM_MSG, msg_buf, sizeof(msg_buf));
-        msg_dirty = false;
     }
 }
 
@@ -497,37 +517,58 @@ void hud_bot_bar(uint8_t col, uint8_t row, uint8_t cells, uint8_t val, uint8_t m
     }
 }
 
+void chart_bg_clear(void)
+{
+    uint8_t row[TXT_COLS];
+    memset(row, HT_CH_EMPTY_T, sizeof(row));
+    for (uint8_t r = 0; r < 17; r++)
+        xram0_write((uint16_t)(XRAM_MAP_PSKY + (uint16_t)r * TXT_COLS), row, TXT_COLS);
+}
+
+void chart_bg_tile(uint8_t col, uint8_t row, uint8_t tile)
+{
+    if (col < TXT_COLS && row < 17)
+        xram0_poke8((uint16_t)(XRAM_MAP_PSKY + (uint16_t)row * TXT_COLS + col), tile);
+}
+
+uint8_t chart_bg_get(uint8_t col, uint8_t row)
+{
+    if (col < TXT_COLS && row < 17)
+        return xram0_peek8((uint16_t)(XRAM_MAP_PSKY + (uint16_t)row * TXT_COLS + col));
+    return HT_CH_EMPTY_T;
+}
+
 void msg_clear(void)
 {
+    for (uint8_t c = 0; c < TXT_COLS; c++)
+        put_cell(&txt_row_tmp[c], ' ', C_WHITE, C_TRANS);
     for (uint8_t r = 0; r < MSG_ROWS; r++)
-        for (uint8_t c = 0; c < TXT_COLS; c++)
-            put_cell(&msg_buf[r][c], ' ', C_WHITE, C_TRANS);
+        xram0_write((uint16_t)(XRAM_MSG + (uint16_t)r * TXT_COLS * 2u), txt_row_tmp, sizeof(txt_row_tmp));
     msg_timer = 0;
-    msg_dirty = true;
 }
 
 void msg_center(uint8_t row, const char *s, uint8_t fg)
 {
     if (row >= MSG_ROWS) return;
     for (uint8_t c = 0; c < TXT_COLS; c++)
-        put_cell(&msg_buf[row][c], ' ', C_WHITE, C_TRANS);
+        put_cell(&txt_row_tmp[c], ' ', C_WHITE, C_TRANS);
     uint8_t len = (uint8_t)strlen(s);
     if (len > 0) {
         uint8_t pad_len = (uint8_t)(len + 4u);
         uint8_t col = (pad_len < TXT_COLS) ? (uint8_t)((TXT_COLS - pad_len) / 2u) : 0;
         if (pad_len < TXT_COLS) {
-            put_cell(&msg_buf[row][col], 17, C_CYAN, C_FRAME);
-            put_cell(&msg_buf[row][col + 1], ' ', fg, C_PANEL);
+            put_cell(&txt_row_tmp[col], 17, C_CYAN, C_FRAME);
+            put_cell(&txt_row_tmp[col + 1], ' ', fg, C_PANEL);
             for (uint8_t i = 0; i < len; i++)
-                put_cell(&msg_buf[row][col + 2 + i], (uint8_t)s[i], fg, C_PANEL);
-            put_cell(&msg_buf[row][col + 2 + len], ' ', fg, C_PANEL);
-            put_cell(&msg_buf[row][col + 3 + len], 16, C_CYAN, C_FRAME);
+                put_cell(&txt_row_tmp[col + 2 + i], (uint8_t)s[i], fg, C_PANEL);
+            put_cell(&txt_row_tmp[col + 2 + len], ' ', fg, C_PANEL);
+            put_cell(&txt_row_tmp[col + 3 + len], 16, C_CYAN, C_FRAME);
         } else {
             for (uint8_t i = 0; i < len && i < TXT_COLS; i++)
-                put_cell(&msg_buf[row][i], (uint8_t)s[i], fg, C_PANEL);
+                put_cell(&txt_row_tmp[i], (uint8_t)s[i], fg, C_PANEL);
         }
     }
-    msg_dirty = true;
+    xram0_write((uint16_t)(XRAM_MSG + (uint16_t)row * TXT_COLS * 2u), txt_row_tmp, sizeof(txt_row_tmp));
 }
 
 void msg_flash(const char *s, uint8_t fg, uint8_t frames)
