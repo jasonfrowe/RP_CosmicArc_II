@@ -505,7 +505,17 @@ static void update_shuttle_and_beam(void)
     shu_beaming = false;
 
     if (shu_st == SHU_DEAD) {
-        if (shu_rebuild_tm > 0 && --shu_rebuild_tm == 0) {
+        if (shu_rebuild_tm > 0) {
+            shu_rebuild_tm--;
+            /* After the 32-frame explosion, smoothly fast-scroll camera back to the Ark */
+            if (shu_rebuild_tm <= 118u) {
+                int16_t d = wrap_dx(ARK_WX, shu_wx);
+                if (d > 8)       shu_wx = (int16_t)((shu_wx + 8) & WORLD_MASK);
+                else if (d < -8) shu_wx = (int16_t)((shu_wx - 8) & WORLD_MASK);
+                else             shu_wx = ARK_WX;
+            }
+        }
+        if (shu_rebuild_tm == 0) {
             shu_st = SHU_DOCKED;
             shu_wx = ARK_WX;
             shu_y = PL_DOCK_Y;
