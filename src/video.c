@@ -9,12 +9,11 @@
 
 mode5_csprite_t spr[SPR_TOTAL_COUNT];
 
-static mode1_4bpp_data_t txt_buf[TXT_ROWS][TXT_COLS];
 static mode1_4bpp_data_t hud_top_buf[HUD_TOP_ROWS][TXT_COLS];
 static mode1_4bpp_data_t hud_bot_buf[HUD_BOT_ROWS][TXT_COLS];
 static mode1_4bpp_data_t msg_buf[MSG_ROWS][TXT_COLS];
 
-static bool txt_dirty, hud_top_dirty, hud_bot_dirty, msg_dirty, spr_dirty;
+static bool hud_top_dirty, hud_bot_dirty, msg_dirty, spr_dirty;
 static uint8_t msg_timer;
 static mode2_config_t bg0_cfg, bg1_cfg;
 static bool scroll_dirty;
@@ -215,10 +214,6 @@ void video_commit(void)
                     &bg1_cfg.x_pos_px, 2);
         scroll_dirty = false;
     }
-    if (txt_dirty) {
-        xram0_write(XRAM_TXT, txt_buf, sizeof(txt_buf));
-        txt_dirty = false;
-    }
     if (hud_top_dirty) {
         xram0_write(XRAM_HUD_TOP, hud_top_buf, sizeof(hud_top_buf));
         hud_top_dirty = false;
@@ -291,32 +286,39 @@ static void fmt_u32(char *buf, uint32_t val, uint8_t width)
 }
 
 /* ------------------------------------------------------------------ */
-/* Fullscreen 40x30 text (VID_MODE_MENU)                              */
+/* Fullscreen 40x30 text (VID_MODE_MENU) - written directly to XRAM   */
 /* ------------------------------------------------------------------ */
+
+static mode1_4bpp_data_t txt_row_tmp[TXT_COLS];
 
 void txt_clear(uint8_t bg)
 {
+    for (uint8_t c = 0; c < TXT_COLS; c++)
+        put_cell(&txt_row_tmp[c], ' ', C_WHITE, bg);
     for (uint8_t r = 0; r < TXT_ROWS; r++)
-        for (uint8_t c = 0; c < TXT_COLS; c++)
-            put_cell(&txt_buf[r][c], ' ', C_WHITE, bg);
-    txt_dirty = true;
+        xram0_write((uint16_t)(XRAM_TXT + (uint16_t)r * TXT_COLS * 2u), txt_row_tmp, sizeof(txt_row_tmp));
 }
 
 void txt_put(uint8_t col, uint8_t row, uint8_t ch, uint8_t fg, uint8_t bg)
 {
     if (col < TXT_COLS && row < TXT_ROWS) {
-        put_cell(&txt_buf[row][col], ch, fg, bg);
-        txt_dirty = true;
+        uint16_t cell = (uint16_t)ch | ((uint16_t)(((bg & 0x0Fu) << 4) | (fg & 0x0Fu)) << 8);
+        xram0_poke16((uint16_t)(XRAM_TXT + ((uint16_t)row * TXT_COLS + col) * 2u), cell);
     }
 }
 
 void txt_str(uint8_t col, uint8_t row, const char *s, uint8_t fg, uint8_t bg)
 {
     if (row >= TXT_ROWS) return;
+    uint8_t n = 0;
+    uint8_t c0 = col;
     while (*s && col < TXT_COLS) {
-        put_cell(&txt_buf[row][col++], (uint8_t)*s++, fg, bg);
+        put_cell(&txt_row_tmp[n++], (uint8_t)*s++, fg, bg);
+        col++;
     }
-    txt_dirty = true;
+    if (n > 0)
+        xram0_write((uint16_t)(XRAM_TXT + ((uint16_t)row * TXT_COLS + c0) * 2u),
+                    txt_row_tmp, (uint16_t)n * 2u);
 }
 
 void txt_center(uint8_t row, const char *s, uint8_t fg, uint8_t bg)

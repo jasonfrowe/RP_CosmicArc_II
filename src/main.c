@@ -2,11 +2,15 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include "achieve.h"
+#include "galaxy.h"
 #include "game.h"
 #include "input.h"
 #include "math_fixed.h"
 #include "music.h"
 #include "planet.h"
+#include "port.h"
+#include "save.h"
 #include "sfx.h"
 #include "space.h"
 #include "video.h"
@@ -20,6 +24,9 @@ uint8_t     g_save_slot = 0;
 uint8_t     g_pending_ach = 0xFFu;
 volatile uint16_t lag_frames = 0;
 
+static bool quick_run = false;
+static bool space_from_warp = false;
+
 const char *const WORLD_NAMES[NUM_WORLDS] = {
     "VERDA", "RUBRA", "GLACI", "UMBRA", "ARENA", "TOXIS"
 };
@@ -29,7 +36,7 @@ const char *const SPECIES_NAMES[NUM_SPECIES] = {
 };
 
 /* ------------------------------------------------------------------ */
-/* Voyage helpers                                                     */
+/* Voyage Helpers                                                     */
 /* ------------------------------------------------------------------ */
 
 uint8_t voy_hull_max(void)
@@ -95,7 +102,7 @@ void ach_check_all(void)
 void voy_new(uint32_t seed)
 {
     memset(&g_voy, 0, sizeof(g_voy));
-    g_voy.magic = 0x53324143u; /* 'CA2S' */
+    g_voy.magic = 0x53324143u;
     g_voy.seed = seed ? seed : 0xC051C202u;
     g_voy.sector = 0;
     g_voy.stardate = 1;
@@ -105,11 +112,14 @@ void voy_new(uint32_t seed)
 }
 
 /* ------------------------------------------------------------------ */
-/* Title Screen                                                       */
+/* Title Screen & 3-Slot Save Picker                                  */
 /* ------------------------------------------------------------------ */
 
 static uint8_t title_sel = 0;
 static uint16_t title_ticks = 0;
+static uint8_t slot_mode = 0; /* 0=main menu, 1=pick slot new, 2=pick slot continue */
+static uint8_t slot_sel = 0;
+static save_info_t slot_info[SAVE_SLOTS];
 
 static const char *const title_items[] = {
     "NEW VOYAGE",
@@ -119,6 +129,12 @@ static const char *const title_items[] = {
 };
 #define TITLE_NITEMS 4
 
+static void probe_all_slots(void)
+{
+    for (uint8_t i = 0; i < SAVE_SLOTS; i++)
+        save_probe(i, &slot_info[i]);
+}
+
 static void title_draw_menu(void)
 {
     txt_clear(C_TRANS);
@@ -127,27 +143,55 @@ static void title_draw_menu(void)
     txt_center(5,  "   ALPHA RO CLUSTER  -  RP6502    ", C_CYAN, C_TRANS);
     txt_center(6,  "==================================", C_CYAN, C_TRANS);
 
-    for (uint8_t i = 0; i < TITLE_NITEMS; i++) {
-        uint8_t row = (uint8_t)(16 + i * 2);
-        bool sel = (i == title_sel);
-        if (sel) {
-            txt_str(10, row, "> ", C_GOLD, C_PANEL);
-            txt_str(12, row, title_items[i], C_WHITE, C_PANEL);
-            txt_str(28, row, " <", C_GOLD, C_PANEL);
-        } else {
-            txt_str(12, row, title_items[i], C_GREY, C_TRANS);
+    if (slot_mode == 0) {
+        for (uint8_t i = 0; i < TITLE_NITEMS; i++) {
+            uint8_t row = (uint8_t)(16 + i * 2);
+            bool sel = (i == title_sel);
+            if (sel) {
+                txt_str(10, row, "> ", C_GOLD, C_PANEL);
+                txt_str(12, row, title_items[i], C_WHITE, C_PANEL);
+                txt_str(28, row, " <", C_GOLD, C_PANEL);
+            } else {
+                txt_str(12, row, title_items[i], C_GREY, C_TRANS);
+            }
         }
+        txt_center(25, "ARROWS/WASD: MOVE   Z/SPACE: FIRE/BEAM", C_DIM, C_TRANS);
+        txt_center(26, "X/K: FIGHTER/DROP/CHART   ENTER: START", C_DIM, C_TRANS);
+        txt_center(28, "PICOCOMPUTER 6502  -  OPL2 FM AUDIO", C_TEAL, C_TRANS);
+    } else {
+        txt_center(15, slot_mode == 1 ? "SELECT SLOT FOR NEW VOYAGE" : "SELECT VOYAGE TO CONTINUE",
+                   C_GOLD, C_PANEL);
+        for (uint8_t i = 0; i < SAVE_SLOTS; i++) {
+            uint8_t row = (uint8_t)(18 + i * 2);
+            bool sel = (i == slot_sel);
+            uint8_t bg = sel ? C_FRAME : C_PANEL;
+            for (uint8_t c = 2; c < 38; c++) txt_put(c, row, ' ', C_WHITE, bg);
+            txt_str(3, row, sel ? ">" : " ", C_GOLD, bg);
+            txt_str(4, row, "SLOT ", C_CYAN, bg);
+            txt_num(9, row, (uint32_t)(i + 1), 1, C_WHITE, bg);
+            if (slot_info[i].valid) {
+                txt_str(12, row, "S", C_GREY, bg);
+                txt_num(13, row, (uint32_t)(slot_info[i].sector + 1), 2, C_WHITE, bg);
+                txt_str(16, row, "D", C_GREY, bg);
+                txt_num(17, row, slot_info[i].stardate, 3, C_CYAN, bg);
+                txt_str(21, row, "$", C_GOLD, bg);
+                txt_num(22, row, slot_info[i].credits, 5, C_WHITE, bg);
+                txt_str(29, row, "ACH", C_GREEN, bg);
+                txt_num(33, row, slot_info[i].ach_count, 2, C_GOLD, bg);
+            } else {
+                txt_str(14, row, "--- EMPTY SLOT ---", C_DIM, bg);
+            }
+        }
+        txt_center(26, "[Z] SELECT    [X] BACK    [ESC] ERASE", C_DIM, C_TRANS);
     }
-
-    txt_center(25, "ARROWS/WASD: MOVE   Z/SPACE: FIRE/BEAM", C_DIM, C_TRANS);
-    txt_center(26, "X/K: FIGHTER/DROP/CHART   ENTER: START", C_DIM, C_TRANS);
-    txt_center(28, "PICOCOMPUTER 6502  -  OPL2 FM AUDIO", C_TEAL, C_TRANS);
 }
 
 static void enter_title(void)
 {
     g_mode = GM_TITLE;
+    slot_mode = 0;
     title_ticks = 0;
+    quick_run = false;
     video_set_mode(VID_MODE_MENU, 0);
     title_draw_menu();
     music_play("ROM:Title.vgm");
@@ -157,36 +201,88 @@ static void title_update(void)
 {
     title_ticks++;
 
-    /* Hover the Ark gently in the middle of the title screen */
     int16_t ay = 76 + (sin256((uint8_t)(title_ticks << 1)) >> 6);
     uint16_t ark_ptr = (uint16_t)(XRAM_IMG_ARK + (((title_ticks >> 4) & 1u) * ARK_FRAME_BYTES));
     spr_place(0, ark_ptr, PAL_ARK, MODE5_SIZE(ARK_W, ARK_H), MODE5_4BPP, (SCREEN_W - ARK_W) / 2, ay);
 
-    /* Orbit a little saucer around the Ark */
     uint8_t ang = (uint8_t)(title_ticks * 2u);
     int16_t sx = (SCREEN_W / 2 - SAUCER_W / 2) + ((cos256(ang) * 72) >> 8);
     int16_t sy = (ay + 12) + ((sin256(ang) * 20) >> 8);
     uint16_t sau_ptr = (uint16_t)(XRAM_IMG_SAUCER + (((title_ticks >> 2) & 3u) * SAUCER_FRAME_BYTES));
     spr_place(1, sau_ptr, PAL_SAUCER, MODE5_SIZE(SAUCER_W, SAUCER_H), MODE5_4BPP, sx, sy);
 
-    if (in_pressed & IN_UP) {
-        title_sel = (title_sel == 0) ? (TITLE_NITEMS - 1) : (uint8_t)(title_sel - 1);
-        sfx_player(SFX_BLIP, SFX_PRI_LOW);
-        title_draw_menu();
-    } else if (in_pressed & IN_DOWN) {
-        title_sel = (uint8_t)((title_sel + 1) % TITLE_NITEMS);
-        sfx_player(SFX_BLIP, SFX_PRI_LOW);
-        title_draw_menu();
-    } else if (in_pressed & (IN_FIRE | IN_START)) {
-        sfx_player(SFX_DOCK, SFX_PRI_EVENT);
-        if (title_sel == 2) {
-            voy_new(0xCA200001u ^ ((uint32_t)title_ticks << 8));
-            g_mode = GM_SPACE;
-            space_enter(1, true);
-        } else if (title_sel == 3) {
-            voy_new(0xCA200002u ^ ((uint32_t)title_ticks << 8));
-            g_mode = GM_PLANET;
-            planet_enter(0, 1, 4, true, 0);
+    if (slot_mode == 0) {
+        if (in_pressed & IN_UP) {
+            title_sel = (title_sel == 0) ? (TITLE_NITEMS - 1) : (uint8_t)(title_sel - 1);
+            sfx_player(SFX_BLIP, SFX_PRI_LOW);
+            title_draw_menu();
+        } else if (in_pressed & IN_DOWN) {
+            title_sel = (uint8_t)((title_sel + 1) % TITLE_NITEMS);
+            sfx_player(SFX_BLIP, SFX_PRI_LOW);
+            title_draw_menu();
+        } else if (in_pressed & (IN_FIRE | IN_START)) {
+            sfx_player(SFX_DOCK, SFX_PRI_EVENT);
+            if (title_sel == 0) {
+                probe_all_slots();
+                slot_mode = 1;
+                slot_sel = 0;
+                title_draw_menu();
+            } else if (title_sel == 1) {
+                probe_all_slots();
+                slot_mode = 2;
+                slot_sel = 0;
+                title_draw_menu();
+            } else if (title_sel == 2) {
+                quick_run = true;
+                voy_new(0xCA200001u ^ ((uint32_t)title_ticks << 8));
+                g_mode = GM_SPACE;
+                space_enter(1, true);
+            } else if (title_sel == 3) {
+                quick_run = true;
+                voy_new(0xCA200002u ^ ((uint32_t)title_ticks << 8));
+                g_mode = GM_PLANET;
+                planet_enter(0, 1, 4, true, 0);
+            }
+        }
+    } else {
+        if (in_pressed & IN_UP) {
+            slot_sel = (slot_sel == 0) ? (SAVE_SLOTS - 1) : (uint8_t)(slot_sel - 1);
+            sfx_player(SFX_BLIP, SFX_PRI_LOW);
+            title_draw_menu();
+        } else if (in_pressed & IN_DOWN) {
+            slot_sel = (uint8_t)((slot_sel + 1) % SAVE_SLOTS);
+            sfx_player(SFX_BLIP, SFX_PRI_LOW);
+            title_draw_menu();
+        } else if (in_pressed & IN_BTN2) {
+            slot_mode = 0;
+            sfx_player(SFX_BLIP, SFX_PRI_LOW);
+            title_draw_menu();
+        } else if (in_pressed & IN_START) {
+            save_erase(slot_sel);
+            probe_all_slots();
+            sfx_player(SFX_DENY, SFX_PRI_LOW);
+            title_draw_menu();
+        } else if (in_pressed & IN_FIRE) {
+            g_save_slot = slot_sel;
+            if (slot_mode == 1) {
+                uint32_t seed = rng_state() ^ ((uint32_t)title_ticks << 16) ^ ((uint32_t)ria_vsync() << 8) ^ 0xA5A55A5Au;
+                voy_new(seed);
+                galaxy_generate(g_voy.seed);
+                galaxy_init_voyage_stocks();
+                save_write(g_save_slot);
+                quick_run = false;
+                g_mode = GM_MAP;
+                map_enter();
+            } else {
+                if (save_read(g_save_slot)) {
+                    galaxy_generate(g_voy.seed);
+                    quick_run = false;
+                    g_mode = GM_MAP;
+                    map_enter();
+                } else {
+                    sfx_player(SFX_DENY, SFX_PRI_LOW);
+                }
+            }
         }
     }
 }
@@ -221,29 +317,109 @@ int main(void)
         g_frame++;
         msg_tick();
 
-        if (g_mode == GM_TITLE) {
+        switch (g_mode) {
+        case GM_TITLE:
             video_twinkle_stars(g_frame);
             title_update();
-        } else if (g_mode == GM_SPACE) {
+            break;
+
+        case GM_MAP: {
+            map_action_t act = map_update();
+            if (act == MAP_GO_SPACE) {
+                space_from_warp = true;
+                g_mode = GM_SPACE;
+                space_enter(map_enc_wave, false);
+            } else if (act == MAP_GO_PLANET) {
+                uint8_t s = g_voy.sector;
+                uint8_t w = (uint8_t)((g_gx.info[s] >> 2) & 7u);
+                uint8_t lv = galaxy_planet_level(s);
+                uint8_t pop = galaxy_planet_pop(s);
+                bool rel = (s == g_voy.relic_sec && g_voy.relic_state == 0);
+                g_mode = GM_PLANET;
+                planet_enter(w, lv, pop, rel, s);
+            } else if (act == MAP_GO_PORT) {
+                g_mode = GM_PORT;
+                port_enter();
+            } else if (act == MAP_GO_ACHIEVE) {
+                g_mode = GM_ACHIEVE;
+                achieve_enter();
+            } else if (act == MAP_GO_TITLE) {
+                enter_title();
+            }
+            break;
+        }
+
+        case GM_PORT:
+            if (port_update()) {
+                if (galaxy_roll_encounter(g_voy.sector)) {
+                    space_from_warp = false;
+                    g_mode = GM_SPACE;
+                    space_enter(map_enc_wave, false);
+                } else {
+                    g_mode = GM_MAP;
+                    map_enter();
+                }
+            }
+            break;
+
+        case GM_ACHIEVE:
+            if (achieve_update()) {
+                g_mode = GM_MAP;
+                map_enter();
+            }
+            break;
+
+        case GM_SPACE: {
             space_result_t r = space_update();
             if (r == SPACE_ARK_LOST) {
                 g_mode = GM_ESCAPEPOD;
                 escape_enter();
             } else if (r == SPACE_CLEARED) {
-                enter_title();
+                if (quick_run) {
+                    enter_title();
+                } else {
+                    if (space_from_warp) {
+                        g_voy.sector = map_dest_sector;
+                        space_from_warp = false;
+                    }
+                    g_mode = GM_MAP;
+                    map_enter();
+                }
             }
-        } else if (g_mode == GM_PLANET) {
+            break;
+        }
+
+        case GM_PLANET: {
             planet_result_t r = planet_update();
             if (r == PLANET_ARK_LOST) {
                 g_mode = GM_ESCAPEPOD;
                 escape_enter();
             } else if (r == PLANET_DONE) {
-                enter_title();
+                if (quick_run) {
+                    enter_title();
+                } else if (galaxy_roll_encounter(g_voy.sector)) {
+                    space_from_warp = false;
+                    g_mode = GM_SPACE;
+                    space_enter(map_enc_wave, false);
+                } else {
+                    g_mode = GM_MAP;
+                    map_enter();
+                }
             }
-        } else if (g_mode == GM_ESCAPEPOD) {
+            break;
+        }
+
+        case GM_ESCAPEPOD:
             if (escape_update()) {
-                enter_title();
+                if (quick_run) {
+                    enter_title();
+                } else {
+                    save_write(g_save_slot);
+                    g_mode = GM_MAP;
+                    map_enter();
+                }
             }
+            break;
         }
     }
 }

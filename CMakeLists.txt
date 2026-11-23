@@ -56,11 +56,15 @@ target_compile_options(RP_CosmicArc_II PRIVATE -Oz -Wall -Wextra)
 
 target_sources(RP_CosmicArc_II PRIVATE
     src/main.c
+    src/achieve.c
+    src/galaxy.c
     src/input.c
     src/math_fixed.c
     src/music.c
     src/opl.c
     src/planet.c
+    src/port.c
+    src/save.c
     src/sfx.c
     src/space.c
     src/vgm.c
