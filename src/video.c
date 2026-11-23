@@ -16,7 +16,6 @@ static mode1_4bpp_data_t msg_buf[MSG_ROWS][TXT_COLS];
 
 static bool txt_dirty, hud_top_dirty, hud_bot_dirty, msg_dirty, spr_dirty;
 static uint8_t msg_timer;
-static vid_mode_t cur_mode = VID_MODE_NONE;
 static mode2_config_t bg0_cfg, bg1_cfg;
 static bool scroll_dirty;
 
@@ -104,7 +103,6 @@ void video_set_mode(vid_mode_t mode, uint8_t world_idx)
 {
     /* Reset canvas to clear previous plane registrations cleanly */
     xreg_vga_canvas(CANVAS_320X240);
-    cur_mode = mode;
     spr_hide_all();
     msg_clear();
 

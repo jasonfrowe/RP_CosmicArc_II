@@ -7,6 +7,7 @@
 #include "math_fixed.h"
 #include "music.h"
 #include "sfx.h"
+#include "space.h"
 #include "video.h"
 #include "xram.h"
 
@@ -177,7 +178,11 @@ static void title_update(void)
         title_draw_menu();
     } else if (in_pressed & (IN_FIRE | IN_START)) {
         sfx_player(SFX_DOCK, SFX_PRI_EVENT);
-        /* Modes will be wired in Milestones 2-4 */
+        if (title_sel == 2) {
+            voy_new(0xCA200001u ^ ((uint32_t)title_ticks << 8));
+            g_mode = GM_SPACE;
+            space_enter(1, true);
+        }
     }
 }
 
@@ -214,6 +219,18 @@ int main(void)
         if (g_mode == GM_TITLE) {
             video_twinkle_stars(g_frame);
             title_update();
+        } else if (g_mode == GM_SPACE) {
+            space_result_t r = space_update();
+            if (r == SPACE_ARK_LOST) {
+                g_mode = GM_ESCAPEPOD;
+                escape_enter();
+            } else if (r == SPACE_CLEARED) {
+                enter_title();
+            }
+        } else if (g_mode == GM_ESCAPEPOD) {
+            if (escape_update()) {
+                enter_title();
+            }
         }
     }
 }
