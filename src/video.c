@@ -14,6 +14,8 @@ static mode1_4bpp_data_t hud_bot_buf[HUD_BOT_ROWS][TXT_COLS];
 static mode1_4bpp_data_t msg_buf[MSG_ROWS][TXT_COLS];
 
 static bool hud_top_dirty, hud_bot_dirty, msg_dirty, spr_dirty;
+static uint8_t txt_front = 0;
+static bool txt_swap_pending = false;
 static uint8_t msg_timer;
 static mode2_config_t bg0_cfg, bg1_cfg;
 static bool scroll_dirty;
@@ -214,6 +216,12 @@ void video_commit(void)
                     &bg1_cfg.x_pos_px, 2);
         scroll_dirty = false;
     }
+    if (txt_swap_pending) {
+        txt_front ^= 1u;
+        uint16_t ptr = (uint16_t)(XRAM_TXT + (uint16_t)txt_front * XRAM_TXT_PAGE_BYTES);
+        xram0_write((uint16_t)(XRAM_TXT_CONFIG + offsetof(mode1_config_t, xram_data_ptr)), &ptr, 2);
+        txt_swap_pending = false;
+    }
     if (hud_top_dirty) {
         xram0_write(XRAM_HUD_TOP, hud_top_buf, sizeof(hud_top_buf));
         hud_top_dirty = false;
@@ -286,24 +294,34 @@ static void fmt_u32(char *buf, uint32_t val, uint8_t width)
 }
 
 /* ------------------------------------------------------------------ */
-/* Fullscreen 40x30 text (VID_MODE_MENU) - written directly to XRAM   */
+/* Fullscreen 40x30 text (VID_MODE_MENU) - double-buffered in XRAM    */
 /* ------------------------------------------------------------------ */
 
 static mode1_4bpp_data_t txt_row_tmp[TXT_COLS];
 
+static uint16_t txt_back_base(void)
+{
+    uint8_t back = (uint8_t)(txt_front ^ 1u);
+    return (uint16_t)(XRAM_TXT + (uint16_t)back * XRAM_TXT_PAGE_BYTES);
+}
+
 void txt_clear(uint8_t bg)
 {
+    uint16_t base = txt_back_base();
     for (uint8_t c = 0; c < TXT_COLS; c++)
         put_cell(&txt_row_tmp[c], ' ', C_WHITE, bg);
     for (uint8_t r = 0; r < TXT_ROWS; r++)
-        xram0_write((uint16_t)(XRAM_TXT + (uint16_t)r * TXT_COLS * 2u), txt_row_tmp, sizeof(txt_row_tmp));
+        xram0_write((uint16_t)(base + (uint16_t)r * TXT_COLS * 2u), txt_row_tmp, sizeof(txt_row_tmp));
+    txt_swap_pending = true;
 }
 
 void txt_put(uint8_t col, uint8_t row, uint8_t ch, uint8_t fg, uint8_t bg)
 {
     if (col < TXT_COLS && row < TXT_ROWS) {
+        uint16_t base = txt_back_base();
         uint16_t cell = (uint16_t)ch | ((uint16_t)(((bg & 0x0Fu) << 4) | (fg & 0x0Fu)) << 8);
-        xram0_poke16((uint16_t)(XRAM_TXT + ((uint16_t)row * TXT_COLS + col) * 2u), cell);
+        xram0_poke16((uint16_t)(base + ((uint16_t)row * TXT_COLS + col) * 2u), cell);
+        txt_swap_pending = true;
     }
 }
 
@@ -316,9 +334,12 @@ void txt_str(uint8_t col, uint8_t row, const char *s, uint8_t fg, uint8_t bg)
         put_cell(&txt_row_tmp[n++], (uint8_t)*s++, fg, bg);
         col++;
     }
-    if (n > 0)
-        xram0_write((uint16_t)(XRAM_TXT + ((uint16_t)row * TXT_COLS + c0) * 2u),
+    if (n > 0) {
+        uint16_t base = txt_back_base();
+        xram0_write((uint16_t)(base + ((uint16_t)row * TXT_COLS + c0) * 2u),
                     txt_row_tmp, (uint16_t)n * 2u);
+        txt_swap_pending = true;
+    }
 }
 
 void txt_center(uint8_t row, const char *s, uint8_t fg, uint8_t bg)

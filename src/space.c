@@ -907,6 +907,7 @@ static void update_spawner(void)
         } else {
             uint8_t want = (s_guns_left > 0 && (s_raiders_left == 0 || (rng_u8() & 1u))) ? PR_GUN : PR_RAID;
             if (spawn_pirate(want)) {
+                live_pirates++;
                 if (want == PR_GUN) s_guns_left--;
                 else s_raiders_left--;
                 s_pirate_tm = 120;
@@ -945,6 +946,7 @@ static void update_spawner(void)
             uint8_t ln = rng_u8() & 7u;
             uint8_t rt = (s_pr_window > 0) ? RK_S : RK_L;
             if (spawn_rock(rt, ln, TO_FP(lane_sx[ln]), TO_FP(lane_sy[ln]), rock_base_speed())) {
+                live_rocks++;
                 s_rocks_left--;
                 uint8_t gap = (s_wave >= 7) ? 40 : (uint8_t)(110 - s_wave * 10);
                 s_rock_tm = gap;
@@ -1088,13 +1090,24 @@ space_result_t space_update(void)
         break;
 
     case SS_CLEAR:
+        /* Let final explosions finish animating cleanly */
+        for (uint8_t i = 0; i < MAX_BOOMS; i++)
+            if (booms[i].timer > 0) booms[i].timer--;
+        memset(bolts, 0, sizeof(bolts));
+        memset(shots, 0, sizeof(shots));
+        memset(pods, 0, sizeof(pods));
         if (--s_timer == 0) {
             msg_clear();
+            memset(rocks, 0, sizeof(rocks));
+            memset(pirates, 0, sizeof(pirates));
+            memset(booms, 0, sizeof(booms));
             s_state = SS_DEPART;
         }
         break;
 
     case SS_DEPART:
+        for (uint8_t i = 0; i < MAX_BOOMS; i++)
+            if (booms[i].timer > 0) booms[i].timer--;
         s_ark_y -= 2;
         if (s_ark_y < -(int16_t)ARK_H) {
             if (s_quick) {

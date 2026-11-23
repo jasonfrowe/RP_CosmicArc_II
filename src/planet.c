@@ -99,6 +99,7 @@ static int16_t  shu_y;
 static int16_t  shu_vx;       /* 12.4 fixed point */
 static int16_t  shu_subx;     /* 12.4 fractional accumulator */
 static uint8_t  shu_launch_hold;
+static bool     shu_can_dock;
 static uint16_t shu_rebuild_tm;
 static uint8_t  shu_cargo;
 static uint8_t  shu_cargo_idx;
@@ -526,6 +527,7 @@ static void update_shuttle_and_beam(void)
         if (shu_y >= PL_YMIN + 4) {
             shu_y = PL_YMIN + 4;
             shu_st = SHU_FLYING;
+            shu_can_dock = false;
         }
         return;
     }
@@ -667,15 +669,23 @@ static void update_shuttle_and_beam(void)
     shu_subx -= (step_x << 4);
     shu_wx = (shu_wx + step_x) & WORLD_MASK;
 
+    /* Re-enable docking once shuttle has dropped 12px or moved outside the doorway */
+    int16_t dx_ark = wrap_dx(shu_wx, ARK_WX);
+    if (!shu_can_dock) {
+        if (shu_y >= PL_YMIN + 16 || dx_ark < -DOCK_ZONE || dx_ark > DOCK_ZONE || !(in_held & (IN_LEFT | IN_RIGHT))) {
+            if (shu_y >= PL_YMIN + 16 || dx_ark < -DOCK_ZONE || dx_ark > DOCK_ZONE)
+                shu_can_dock = true;
+        }
+    }
+
     /* Vertical flight */
     bool move_v = (shu_cargo == CARGO_RELIC) ? ((g_frame & 3u) == 0) :
                   ((shu_cargo == CARGO_ORE) ? ((g_frame & 1u) == 0) : true);
     if (move_v) {
         if (in_held & IN_UP) {
-            /* Check docking under Ark doorway */
-            int16_t dx_ark = wrap_dx(shu_wx, ARK_WX);
+            /* Allow docking with Up, Up+Left, or Up+Right when in the doorway */
             if (shu_y <= PL_YMIN + 16 && dx_ark >= -DOCK_ZONE && dx_ark <= DOCK_ZONE &&
-                !(in_held & (IN_LEFT | IN_RIGHT))) {
+                (shu_can_dock || !(in_held & (IN_LEFT | IN_RIGHT)))) {
                 shu_st = SHU_AUTO_IN;
                 shu_vx = 0;
                 return;

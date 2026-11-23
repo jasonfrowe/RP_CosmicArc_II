@@ -188,8 +188,8 @@ typedef struct {
     /* Palettes */
     palette_t palettes[PAL_COUNT];
 
-    /* Text buffers */
-    mode1_4bpp_data_t txt[TXT_ROWS][TXT_COLS];
+    /* Text buffers (double-buffered fullscreen txt in XRAM for flicker-free menus) */
+    mode1_4bpp_data_t txt[2][TXT_ROWS][TXT_COLS];
     mode1_4bpp_data_t hud_top[HUD_TOP_ROWS][TXT_COLS];
     mode1_4bpp_data_t hud_bot[HUD_BOT_ROWS][TXT_COLS];
     mode1_4bpp_data_t msg[MSG_ROWS][TXT_COLS];
@@ -236,6 +236,7 @@ _Static_assert((XRAM_OPL & 0xFF) == 0, "OPL2 must be on a page boundary");
 #define XRAM_SPR            offsetof(xram_layout_t, spr)
 #define XRAM_PALETTES       offsetof(xram_layout_t, palettes)
 #define XRAM_TXT            offsetof(xram_layout_t, txt)
+#define XRAM_TXT_PAGE_BYTES (TXT_ROWS * TXT_COLS * sizeof(mode1_4bpp_data_t))
 #define XRAM_HUD_TOP        offsetof(xram_layout_t, hud_top)
 #define XRAM_HUD_BOT        offsetof(xram_layout_t, hud_bot)
 #define XRAM_MSG            offsetof(xram_layout_t, msg)
