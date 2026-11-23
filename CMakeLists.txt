@@ -60,6 +60,7 @@ target_sources(RP_CosmicArc_II PRIVATE
     src/math_fixed.c
     src/music.c
     src/opl.c
+    src/planet.c
     src/sfx.c
     src/space.c
     src/vgm.c

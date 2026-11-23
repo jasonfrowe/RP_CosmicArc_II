@@ -6,6 +6,7 @@
 #include "input.h"
 #include "math_fixed.h"
 #include "music.h"
+#include "planet.h"
 #include "sfx.h"
 #include "space.h"
 #include "video.h"
@@ -182,6 +183,10 @@ static void title_update(void)
             voy_new(0xCA200001u ^ ((uint32_t)title_ticks << 8));
             g_mode = GM_SPACE;
             space_enter(1, true);
+        } else if (title_sel == 3) {
+            voy_new(0xCA200002u ^ ((uint32_t)title_ticks << 8));
+            g_mode = GM_PLANET;
+            planet_enter(0, 1, 4, true, 0);
         }
     }
 }
@@ -225,6 +230,14 @@ int main(void)
                 g_mode = GM_ESCAPEPOD;
                 escape_enter();
             } else if (r == SPACE_CLEARED) {
+                enter_title();
+            }
+        } else if (g_mode == GM_PLANET) {
+            planet_result_t r = planet_update();
+            if (r == PLANET_ARK_LOST) {
+                g_mode = GM_ESCAPEPOD;
+                escape_enter();
+            } else if (r == PLANET_DONE) {
                 enter_title();
             }
         } else if (g_mode == GM_ESCAPEPOD) {
