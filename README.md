@@ -1,8 +1,13 @@
 # Cosmic Arc II (Picocomputer RP6502)
 
-A full port of **Cosmic Arc II** (originally built for the Atari 7800 + AstroCart) to the **Picocomputer RP6502**, taking advantage of the RP6502's 8 MHz 65C02 CPU, 320×240 3-plane 4bpp VGA graphics, hardware tilemap scrolling, Yamaha OPL2 FM audio, USB keyboard/gamepad input, and `SAVE:` filesystem persistence.
+<!-- rp6502
+preset: llvm-mos/Release
+publish: RP_CosmicArc_II.zip
+frames: 60
+-->
+[![RP_CosmicArc_II](https://jasonfrowe.github.io/RP_CosmicArc_II/RP_CosmicArc_II/screenshot.png)](https://jasonfrowe.github.io/RP_CosmicArc_II/RP_CosmicArc_II/)
 
-![Title Screen](docs/m1_title.png)
+A full port of **Cosmic Arc II** (originally built for the Atari 7800 + AstroCart) to the **Picocomputer RP6502**, taking advantage of the RP6502's 8 MHz 65C02 CPU, 320×240 3-plane 4bpp VGA graphics, hardware tilemap scrolling, Yamaha OPL2 FM audio, USB keyboard/gamepad input, and `SAVE:` filesystem persistence.
 
 ## Features
 

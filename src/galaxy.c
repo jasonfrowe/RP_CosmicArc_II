@@ -714,6 +714,7 @@ map_action_t map_update(void)
                 }
                 g_voy.sector = it;
                 galaxy_visit(it);
+                save_write(g_save_slot);
                 chart_cx = g_gx.cell[it] & 0x0Fu;
                 chart_cy = g_gx.cell[it] >> 4;
                 build_sector_items();

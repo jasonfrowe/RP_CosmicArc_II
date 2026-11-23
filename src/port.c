@@ -262,6 +262,7 @@ bool port_update(void)
             g_voy.stasis[pt_sel]--;
             g_voy.keep[pt_sel]++;
             ach_check_all();
+            save_write(g_save_slot);
             set_msg("SPECIMEN KEPT IN ARK MANIFEST!");
             sfx_player(SFX_TRADE, SFX_PRI_EVENT);
         }
@@ -397,6 +398,7 @@ bool port_update(void)
             }
             ach_check_all();
         }
+        save_write(g_save_slot);
         port_draw();
     }
     return false;

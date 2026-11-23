@@ -49,9 +49,14 @@ def main():
             save_dir=sdir,
             seed=42,
         )
-        # 2. Verify Continue loads the saved slot cleanly!
+        # 2. Verify continuous auto-save persisted the warp (sector != 0, stardate == 2)
+        import struct
         save_file = Path(sdir) / "ca2_s0.dat"
         assert save_file.exists() and save_file.stat().st_size > 0, "Save file missing!"
+        raw = save_file.read_bytes()
+        magic, seed, sector, stardate = struct.unpack_from("<IIBH", raw, 0)
+        assert magic == 0x53324143, f"Bad save magic: {magic:#x}"
+        assert sector != 0 and stardate == 2, f"Expected auto-save after warp, got sec={sector} day={stardate}"
         run_script(
             'run 20\n'
             'press s\nrun 2\nrelease s\nrun 5\n'
@@ -60,7 +65,7 @@ def main():
             save_dir=sdir,
             seed=42,
         )
-        print(f"Save/Continue verified ({save_file.stat().st_size} bytes)")
+        print(f"Auto-save & Continue verified ({len(raw)} bytes, sector={sector + 1}, stardate={stardate})")
     print("All playtest checks passed!")
 
 

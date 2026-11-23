@@ -380,8 +380,11 @@ int main(void)
                 } else {
                     if (space_from_warp) {
                         g_voy.sector = map_dest_sector;
+                        galaxy_visit(g_voy.sector);
                         space_from_warp = false;
                     }
+                    ach_check_all();
+                    save_write(g_save_slot);
                     g_mode = GM_MAP;
                     map_enter();
                 }
@@ -397,13 +400,17 @@ int main(void)
             } else if (r == PLANET_DONE) {
                 if (quick_run) {
                     enter_title();
-                } else if (galaxy_roll_encounter(g_voy.sector)) {
-                    space_from_warp = false;
-                    g_mode = GM_SPACE;
-                    space_enter(map_enc_wave, false);
                 } else {
-                    g_mode = GM_MAP;
-                    map_enter();
+                    ach_check_all();
+                    save_write(g_save_slot);
+                    if (galaxy_roll_encounter(g_voy.sector)) {
+                        space_from_warp = false;
+                        g_mode = GM_SPACE;
+                        space_enter(map_enc_wave, false);
+                    } else {
+                        g_mode = GM_MAP;
+                        map_enter();
+                    }
                 }
             }
             break;
